@@ -1,5 +1,7 @@
 # Travel Guide
 
+**Live site:** https://travel-guide-bhavin.netlify.app
+
 **Explore beautifully. Plan effortlessly.**
 
 An immersive travel discovery and itinerary-planning website: a living 3D journey through seven landscapes, an interactive globe with destination portals, and a working trip builder that produces day-by-day and hourly itineraries with transparent, inspectable cost estimates.
@@ -165,3 +167,9 @@ See `CREDITS.md` for media, data and audio credits, and `docs/DATA.md` for the d
 - **Sun / Moon theme** toggle (bottom-left) switches light and dark across the site.
 - **Footer**: Terms, Privacy, Security, Status (live service checks), Community, Docs, Contact and **Manage cookies** (shows and clears everything stored in the browser — the site sets no tracking cookies).
 - **Logo**: brushed-brass compass framing a Himalayan dusk, drawn in SVG (`src/components/Logo.tsx`); the favicon is generated from the same component.
+
+## Deployment (Netlify)
+
+- Project `travel-guide-bhavin`. The build runs `scripts/netlify-build.sh`, which downloads the 4K photos and audio from this public GitHub repo when a deploy uploads code only, then runs `npm run build`.
+- **Quote requests** are stored by `netlify/functions/quote.mjs` in Netlify Blobs (store `quote-requests`). The endpoint can only create entries. View them in Netlify → Data & Storage → Blobs; decrypt sealed ones offline with `scripts/decrypt-quote.mjs`.
+- **Firebase (optional)**: set the `VITE_FIREBASE_*` variables (see `.env.example`) and deploy `firestore.rules` to store quote requests in Cloud Firestore instead.
