@@ -692,13 +692,13 @@ html[data-motion='reduced'] .hero-title.cine .w, html[data-motion='reduced'] .he
 
 /* ═══════════ Sun / Moon theme toggle ═══════════ */
 .dock { padding: 6px; }
-.theme-toggle { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: .6rem; cursor: pointer; padding: .35rem .8rem .35rem .4rem; border-radius: 999px; color: var(--glacier); font: 600 .9rem var(--font-body); }
+.theme-toggle { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; cursor: pointer; padding: 2px; border-radius: 999px; flex: none; }
 .theme-toggle:focus-visible { outline: 3px solid var(--sun); }
-.tt-track { position: relative; width: 58px; height: 32px; border-radius: 999px; background: linear-gradient(135deg, #1b2a4a, #0b1226); box-shadow: inset 0 2px 6px rgba(0,0,0,.5); transition: background .5s var(--ease); }
+.tt-track { position: relative; width: 42px; height: 24px; border-radius: 999px; background: linear-gradient(135deg, #1b2a4a, #0b1226); box-shadow: inset 0 2px 6px rgba(0,0,0,.5); transition: background .5s var(--ease); }
 .theme-toggle.light .tt-track { background: linear-gradient(135deg, #8fd3ff, #ffd98a); }
-.tt-knob { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .95rem; background: #e8eefc; color: #2a3557; box-shadow: 0 4px 10px rgba(0,0,0,.35); transition: transform .55s cubic-bezier(.34,1.56,.64,1), background .4s; }
-.theme-toggle.light .tt-knob { transform: translateX(26px) rotate(180deg); background: #fff3c4; color: #c47a00; }
-@media (max-width: 560px) { .tt-label { display: none; } }
+.tt-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; line-height: 1; background: #e8eefc; color: #2a3557; box-shadow: 0 4px 10px rgba(0,0,0,.35); transition: transform .55s cubic-bezier(.34,1.56,.64,1), background .4s; }
+.theme-toggle.light .tt-knob { transform: translateX(18px) rotate(180deg); background: #fff3c4; color: #c47a00; }
+
 
 /* ═══════════ Light (sun) theme ═══════════ */
 html[data-theme='light'] {
@@ -800,3 +800,10 @@ html[data-theme='light'] .footer-bar { border-color: rgba(13, 42, 34, .1); }
   .mapfly.has-route .mapfly-hint { display: none; }
   .mapfly-route { top: .6rem; }
 }
+.nav-tools { flex-wrap: nowrap; }
+@media (max-width: 560px) {
+  .menu-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .nav-tools { gap: .4rem; }
+  .nav .wordmark { font-size: 1.15rem; }
+}
+@media (max-width: 340px) { .nav .wordmark { display: none; } }

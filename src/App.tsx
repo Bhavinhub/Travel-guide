@@ -1,7 +1,7 @@
 import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { COMPANY } from './config/company';
 import { getDestination } from './data/catalog';
-import { Dock, Footer, Nav, Toast } from './components/Shell';
+import { Footer, Nav, Toast } from './components/Shell';
 import { useRoute } from './lib/router';
 import { ATMOSPHERES, useMotion, useStore } from './lib/store';
 import Home from './pages/Home';
@@ -141,7 +141,6 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
       <Footer />
-      <Dock />
       <Toast />
     </>
   );

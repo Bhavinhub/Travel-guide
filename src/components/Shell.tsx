@@ -148,8 +148,9 @@ export function Nav() {
           <NavSearch />
           <a className="btn btn-primary btn-sm hide-sm" href={href('/plan')} data-magnetic>Build My Trip</a>
           <button className="btn btn-sm menu-btn" style={{ display: 'inline-flex' }} aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen(true)}>
-            <span aria-hidden>☰</span> Menu
+            <span aria-hidden>☰</span> <span className="menu-label">Menu</span>
           </button>
+          <ThemeToggle />
         </div>
       </header>
       {open && (
@@ -273,18 +274,16 @@ export function Footer() {
   );
 }
 
-/** Single Sun / Moon control: switches the whole site between light and dark themes. */
-export function Dock() {
+/** Compact Sun / Moon switch in the header: switches the whole site between light and dark themes. */
+export function ThemeToggle() {
   const theme = useStore((s) => s.prefs.theme);
   const setPrefs = useStore((s) => s.setPrefs);
   const next = theme === 'dark' ? 'light' : 'dark';
   return (
-    <div className="dock glass no-print" role="toolbar" aria-label="Display">
-      <button className={`theme-toggle ${theme}`} onClick={() => setPrefs({ theme: next })} aria-label={`Switch to ${next === 'light' ? 'sun (light)' : 'moon (dark)'} mode`} aria-pressed={theme === 'light'}>
-        <span className="tt-track" aria-hidden><span className="tt-knob">{theme === 'light' ? '☀' : '☾'}</span></span>
-        <span className="tt-label">{theme === 'light' ? 'Sun mode' : 'Moon mode'}</span>
-      </button>
-    </div>
+    <button className={`theme-toggle ${theme}`} onClick={() => setPrefs({ theme: next })} title={theme === 'light' ? 'Sun mode — switch to moon' : 'Moon mode — switch to sun'}
+      aria-label={`Switch to ${next === 'light' ? 'sun (light)' : 'moon (dark)'} mode`} aria-pressed={theme === 'light'}>
+      <span className="tt-track" aria-hidden><span className="tt-knob">{theme === 'light' ? '☀' : '☾'}</span></span>
+    </button>
   );
 }
 
