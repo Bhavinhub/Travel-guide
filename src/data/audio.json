@@ -1,0 +1,90 @@
+{
+ "ambience": {
+  "forest": {
+   "file": "File:Birdsong morning 01.ogg",
+   "src": "/audio/birdsong-morning-01.mp3",
+   "author": "Matutinho",
+   "license": "CC BY-SA 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3ABirdsong_morning_01.ogg"
+  },
+  "rain": {
+   "file": "File:Summer thunderstorm in the woods.ogg",
+   "src": "/audio/summer-thunderstorm-in-the-woods.mp3",
+   "author": "Serg Childed",
+   "license": "CC BY-SA 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3ASummer_thunderstorm_in_the_woods.ogg"
+  },
+  "wind": {
+   "file": "File:Howling wind.ogg",
+   "src": "/audio/howling-wind.mp3",
+   "author": "Tvabutzku1234",
+   "license": "CC0",
+   "source": "https://commons.wikimedia.org/wiki/File%3AHowling_wind.ogg"
+  },
+  "ocean": {
+   "file": "File:Ocean Waves on a Tropical Beach.ogg",
+   "src": "/audio/ocean-waves-on-a-tropical-beach.mp3",
+   "author": "Jarrod stanley",
+   "license": "CC0",
+   "source": "https://commons.wikimedia.org/wiki/File%3AOcean_Waves_on_a_Tropical_Beach.ogg"
+  },
+  "city": {
+   "file": "File:Urban Street on a Rainy Afternoon.flac",
+   "src": "/audio/urban-street-on-a-rainy-afternoon.mp3",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "source": "https://commons.wikimedia.org/wiki/File%3AUrban_Street_on_a_Rainy_Afternoon.flac"
+  }
+ },
+ "music": {
+  "forest": {
+   "file": "File:Indian Folk Classical Flute Music (1).wav",
+   "src": "/audio/indian-folk-classical-flute-music-1-.mp3",
+   "author": "MayankSingh33",
+   "license": "CC BY-SA 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3AIndian_Folk_Classical_Flute_Music_(1).wav"
+  },
+  "rainforest": {
+   "file": "File:Indian Folk Classical Flute Music (1).wav",
+   "src": "/audio/indian-folk-classical-flute-music-1-.mp3",
+   "author": "MayankSingh33",
+   "license": "CC BY-SA 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3AIndian_Folk_Classical_Flute_Music_(1).wav"
+  },
+  "valley": {
+   "file": "File:Samuel Corwin - A Man Approaches with Bowed Sitar, Rishikesh.ogg",
+   "src": "/audio/samuel-corwin-a-man-approaches-with-bowed-sitar-rishikesh.mp3",
+   "author": "Samuel Corwin",
+   "license": "CC BY 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3ASamuel_Corwin_-_A_Man_Approaches_with_Bowed_Sitar%2C_Rishikesh.ogg"
+  },
+  "snow": {
+   "file": "File:Samuel Corwin - A Man Approaches with Bowed Sitar, Rishikesh.ogg",
+   "src": "/audio/samuel-corwin-a-man-approaches-with-bowed-sitar-rishikesh.mp3",
+   "author": "Samuel Corwin",
+   "license": "CC BY 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3ASamuel_Corwin_-_A_Man_Approaches_with_Bowed_Sitar%2C_Rishikesh.ogg"
+  },
+  "beach": {
+   "file": "File:Sitar and tabla rendition - Freedom Jam, 2015.oga",
+   "src": "/audio/sitar-and-tabla-rendition-freedom-jam-2015.mp3",
+   "author": "Sitar: Ashok Ayengar, Tabla:Unknown",
+   "license": "CC BY-SA 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3ASitar_and_tabla_rendition_-_Freedom_Jam%2C_2015.oga"
+  },
+  "city": {
+   "file": "File:Mystery Bazaar (ISRC USUAN1700005).mp3",
+   "src": "/audio/mystery-bazaar-isrc-usuan1700005-.mp3",
+   "author": "Kevin MacLeod",
+   "license": "CC BY 3.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3AMystery_Bazaar_(ISRC_USUAN1700005).mp3"
+  },
+  "default": {
+   "file": "File:Sitar and tabla rendition - Freedom Jam, 2015.oga",
+   "src": "/audio/sitar-and-tabla-rendition-freedom-jam-2015.mp3",
+   "author": "Sitar: Ashok Ayengar, Tabla:Unknown",
+   "license": "CC BY-SA 4.0",
+   "source": "https://commons.wikimedia.org/wiki/File%3ASitar_and_tabla_rendition_-_Freedom_Jam%2C_2015.oga"
+  }
+ }
+}

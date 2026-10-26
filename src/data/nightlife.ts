@@ -1,0 +1,177 @@
+import type { NightlifeListing } from './types';
+
+/**
+ * Nightlife is listed by neighbourhood and experience type rather than by named venue.
+ * Venues open, close and change policies often; Travel Guide does not publish venue hours,
+ * availability, party permissions or age rules it has not verified.
+ * Photos show the neighbourhood (via Wikipedia/Wikimedia Commons), not a specific venue.
+ */
+export const NIGHTLIFE: NightlifeListing[] = [
+  {
+    id: 'blr-indiranagar', city: 'bengaluru', title: 'Craft breweries & cocktail bars', area: 'Indiranagar', wiki: 'Indiranagar, Bengaluru',
+    types: ['cocktail', 'live-music', 'relaxed'], atmosphere: 'Lively, sociable taprooms and intimate cocktail bars on and around 100 Feet Road.',
+    music: 'Indie, rock covers, DJ sets on weekends', spendINR: [1500, 3500],
+    transport: 'Namma Metro (Purple Line) to Indiranagar, then a short walk; app cabs widely available.',
+    returnTip: 'Check the last metro time on the day; otherwise pre-book an app cab from a well-lit main road.',
+    alcoholFree: 'Most venues serve mocktails, kombucha or non-alcoholic brews — confirm when booking.',
+  },
+  {
+    id: 'blr-mg-road', city: 'bengaluru', title: 'Rooftop lounges', area: 'MG Road & UB City area', wiki: 'UB City',
+    types: ['rooftop', 'cocktail', 'private-events'], atmosphere: 'Skyline views, dressier crowd, good for celebrations.',
+    music: 'Lounge, house', spendINR: [2500, 6000],
+    transport: 'Metro to MG Road / Cubbon Park; cabs and autos.',
+    returnTip: 'Arrange pickup at the building’s main entrance.',
+    alcoholFree: 'Mocktail menus are common.',
+  },
+  {
+    id: 'bom-lower-parel', city: 'mumbai', title: 'Rooftop & mill-compound bars', area: 'Lower Parel & Worli', wiki: 'Worli',
+    types: ['rooftop', 'cocktail', 'dancing', 'private-events'], atmosphere: 'Converted mill compounds with high-energy bars and rooftop lounges.',
+    music: 'Bollywood, commercial, house', spendINR: [2500, 6000],
+    transport: 'Local train to Lower Parel / Mahalaxmi; taxis and app cabs.',
+    returnTip: 'Taxis queue outside larger compounds; agree a pickup point.',
+    alcoholFree: 'Widely available mocktails.',
+  },
+  {
+    id: 'bom-bandra', city: 'mumbai', title: 'Cocktail bars & live-music cafés', area: 'Bandra West', wiki: 'Bandra',
+    types: ['cocktail', 'live-music', 'relaxed'], atmosphere: 'Neighbourhood bars, live gigs and late cafés.',
+    music: 'Jazz, indie, acoustic', spendINR: [1500, 4000],
+    transport: 'Western Line to Bandra; autos within the suburb.',
+    returnTip: 'Autos and app cabs run late; share your trip with a friend.',
+    alcoholFree: 'Cafés and bars offer non-alcoholic options.',
+  },
+  {
+    id: 'goa-north', city: 'goa', title: 'Beach shacks & beach clubs', area: 'Baga, Anjuna & Vagator', wiki: 'Anjuna',
+    types: ['beach-club', 'beachside', 'dancing', 'live-music'], atmosphere: 'Sunset sessions on the sand that build into late dance nights in peak season.',
+    music: 'House, techno, trance, live bands', spendINR: [1500, 5000],
+    transport: 'Scooter rental (licence required) or taxis; distances between beaches are significant.',
+    returnTip: 'Never ride after drinking — book a taxi in advance for the return.',
+    alcoholFree: 'Fresh juices, coconut water and mocktails are easy to find.',
+  },
+  {
+    id: 'goa-panjim', city: 'goa', title: 'Heritage-quarter bars & live music', area: 'Panaji (Fontainhas)', wiki: 'Panaji',
+    types: ['cocktail', 'live-music', 'relaxed'], atmosphere: 'Quiet tavern-style bars in old Portuguese-era lanes.',
+    music: 'Goan, Portuguese-influenced, jazz', spendINR: [1000, 3000],
+    transport: 'Walkable within Panaji; taxis from beach areas.',
+    returnTip: 'Taxis are fewer late at night — pre-arrange.',
+    alcoholFree: 'Kokum and lime sodas are classic local options.',
+  },
+  {
+    id: 'del-hkv', city: 'delhi', title: 'Lakeside bars & live music', area: 'Hauz Khas Village', wiki: 'Hauz Khas Complex',
+    types: ['cocktail', 'live-music', 'dancing'], atmosphere: 'Bars overlooking the medieval reservoir and ruins.',
+    music: 'Electronic, indie, Bollywood', spendINR: [1500, 4500],
+    transport: 'Metro to Hauz Khas (Yellow/Magenta lines), then a short cab ride.',
+    returnTip: 'Use app cabs and wait inside the venue until the car arrives.',
+    alcoholFree: 'Mocktails available at most venues.',
+  },
+  {
+    id: 'del-cp', city: 'delhi', title: 'Rooftop bars & pubs', area: 'Connaught Place', wiki: 'Connaught Place, New Delhi',
+    types: ['rooftop', 'cocktail', 'private-events'], atmosphere: 'Colonnaded circle with rooftop terraces above.',
+    music: 'Commercial, retro', spendINR: [1500, 4000],
+    transport: 'Rajiv Chowk metro (Blue/Yellow lines).',
+    returnTip: 'Check last-metro timings; cabs are plentiful.',
+    alcoholFree: 'Widely available.',
+  },
+  {
+    id: 'bkk-sukhumvit', city: 'bangkok', title: 'Rooftop bars & cocktail lounges', area: 'Sukhumvit & Silom', wiki: 'Sukhumvit Road',
+    types: ['rooftop', 'cocktail', 'live-music', 'dancing', 'private-events'], atmosphere: 'Sky-high terraces, speakeasies and jazz bars.',
+    music: 'Jazz, house, live bands', spendINR: [2500, 8000],
+    transport: 'BTS Skytrain and MRT; taxis and ride-hailing.',
+    returnTip: 'Use metered taxis or ride-hailing apps after the skytrain closes.',
+    alcoholFree: 'Mocktails and Thai iced teas widely available.',
+  },
+  {
+    id: 'bkk-khaosan', city: 'bangkok', title: 'Street-bar strip', area: 'Khao San Road', wiki: 'Khaosan Road',
+    types: ['dancing', 'relaxed'], atmosphere: 'Busy backpacker street with open-front bars and street food.',
+    music: 'Pop, hip-hop, reggae', spendINR: [800, 2500],
+    transport: 'Chao Phraya boat (daytime) or taxi; no metro station directly on the street.',
+    returnTip: 'Use ride-hailing apps; agree fares before tuk-tuk rides.',
+    alcoholFree: 'Fruit shakes everywhere.',
+  },
+  {
+    id: 'hkt-patong', city: 'phuket', title: 'Beach clubs & nightlife street', area: 'Patong', wiki: 'Patong',
+    types: ['beach-club', 'beachside', 'dancing'], atmosphere: 'Sunset beach clubs and a famous high-energy nightlife street.',
+    music: 'EDM, pop, live covers', spendINR: [1500, 6000],
+    transport: 'Taxis and ride-hailing; roads over the hills are steep and winding.',
+    returnTip: 'Pre-book a return taxi to Kata/Karon; avoid scooter rides at night.',
+    alcoholFree: 'Smoothies and mocktails widely available.',
+  },
+  {
+    id: 'dxb-marina', city: 'dubai', title: 'Waterfront lounges & beach clubs', area: 'Dubai Marina & JBR', wiki: 'Dubai Marina',
+    types: ['rooftop', 'beach-club', 'cocktail', 'private-events', 'dancing'], atmosphere: 'Skyline lounges and daytime beach clubs.',
+    music: 'House, Arabic pop, international DJs', spendINR: [4000, 12000],
+    transport: 'Dubai Metro and Tram; taxis.',
+    returnTip: 'Taxis are plentiful; zero-tolerance drink-driving laws apply.',
+    alcoholFree: 'Excellent mocktail culture. Alcohol is served only in licensed venues.',
+  },
+  {
+    id: 'sin-clarke', city: 'singapore', title: 'Riverside bars & rooftop lounges', area: 'Clarke Quay & Marina Bay', wiki: 'Clarke Quay',
+    types: ['rooftop', 'cocktail', 'live-music', 'dancing', 'private-events'], atmosphere: 'Riverside promenade bars and skyline rooftops.',
+    music: 'Live bands, house, jazz', spendINR: [3500, 10000],
+    transport: 'MRT to Clarke Quay / Bayfront.',
+    returnTip: 'MRT closes around midnight; taxis and ride-hailing after.',
+    alcoholFree: 'Mocktails widely available.',
+  },
+  {
+    id: 'tyo-golden-gai', city: 'tokyo', title: 'Tiny bars & izakaya alleys', area: 'Shinjuku (Golden Gai)', wiki: 'Golden Gai',
+    types: ['cocktail', 'relaxed'], atmosphere: 'Lanes of tiny six-seat bars; some charge a cover and some are regulars-only.',
+    music: 'Varies — jazz, punk, film soundtracks', spendINR: [2500, 6000],
+    transport: 'JR / Metro to Shinjuku.',
+    returnTip: 'Trains stop around midnight — plan for the last train or a taxi.',
+    alcoholFree: 'Soft drinks and teas are available; non-alcoholic choice varies by bar.',
+  },
+  {
+    id: 'tyo-shibuya', city: 'tokyo', title: 'Clubs & live houses', area: 'Shibuya', wiki: 'Shibuya',
+    types: ['dancing', 'live-music'], atmosphere: 'Basement clubs and small live houses.',
+    music: 'Techno, J-pop, indie', spendINR: [3000, 7000],
+    transport: 'Shibuya Station (multiple lines).',
+    returnTip: 'Last trains around midnight; first trains around 5am.',
+    alcoholFree: 'Soft drinks are standard.',
+  },
+  {
+    id: 'lon-soho', city: 'london', title: 'Cocktail bars & jazz clubs', area: 'Soho', wiki: 'Soho',
+    types: ['cocktail', 'live-music', 'dancing'], atmosphere: 'Historic jazz clubs, theatre-district bars.',
+    music: 'Jazz, soul, house', spendINR: [3500, 9000],
+    transport: 'Tube to Tottenham Court Road / Leicester Square; Night Tube on some lines at weekends.',
+    returnTip: 'Check Night Tube and night-bus routes in advance.',
+    alcoholFree: 'Many bars have dedicated low/no-alcohol menus.',
+  },
+  {
+    id: 'lon-shoreditch', city: 'london', title: 'Rooftops & late bars', area: 'Shoreditch', wiki: 'Shoreditch',
+    types: ['rooftop', 'dancing', 'cocktail', 'private-events'], atmosphere: 'Creative East London with rooftops and warehouse venues.',
+    music: 'Electronic, hip-hop, indie', spendINR: [3000, 8000],
+    transport: 'Overground to Shoreditch High Street.',
+    returnTip: 'Night buses run late; ride-hailing is available.',
+    alcoholFree: 'Widely available.',
+  },
+  {
+    id: 'nyc-les', city: 'new-york', title: 'Speakeasies & cocktail bars', area: 'Lower East Side & East Village', wiki: 'Lower East Side',
+    types: ['cocktail', 'relaxed', 'live-music'], atmosphere: 'Hidden-door bars and dive bars in historic tenement blocks.',
+    music: 'Jazz, rock, soul', spendINR: [3500, 9000],
+    transport: 'Subway (F, J/M/Z lines) — the subway runs 24 hours.',
+    returnTip: 'Subway runs all night but less frequently; consider a cab late.',
+    alcoholFree: 'Zero-proof cocktails are common.',
+  },
+  {
+    id: 'nyc-village', city: 'new-york', title: 'Jazz clubs & live music', area: 'Greenwich Village', wiki: 'Greenwich Village',
+    types: ['live-music', 'relaxed'], atmosphere: 'Legendary small jazz rooms and comedy cellars.',
+    music: 'Jazz, blues, comedy', spendINR: [3000, 8000],
+    transport: 'Subway to West 4th Street.',
+    returnTip: 'Subway runs 24 hours.',
+    alcoholFree: 'Soft drinks and mocktails; some venues have drink minimums.',
+  },
+  {
+    id: 'bali-seminyak', city: 'bali', title: 'Sunset beach clubs', area: 'Seminyak & Canggu', wiki: 'Seminyak',
+    types: ['beach-club', 'beachside', 'dancing', 'private-events'], atmosphere: 'Pool-and-ocean sunset clubs with day beds.',
+    music: 'House, deep house', spendINR: [2500, 8000],
+    transport: 'Taxis and ride-hailing; traffic is heavy at sunset.',
+    returnTip: 'Pre-book returns; don’t ride scooters after drinking.',
+    alcoholFree: 'Fresh juices and mocktails widely available.',
+  },
+];
+
+export const NIGHTLIFE_CITIES = [...new Set(NIGHTLIFE.map((n) => n.city))];
+
+export const NIGHT_TYPE_LABELS: Record<NightlifeListing['types'][number], string> = {
+  rooftop: 'Rooftop', cocktail: 'Cocktail bars', 'live-music': 'Live music', 'beach-club': 'Beach clubs',
+  'private-events': 'Private events', dancing: 'Dancing', relaxed: 'Relaxed', beachside: 'Beachside',
+};
