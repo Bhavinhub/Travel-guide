@@ -8,6 +8,30 @@ import { audio } from './audio';
  * - liquid-glass highlight that follows the pointer on .glass
  * Respects reduced motion: when <html data-motion="reduced">, only the ripple remains (as a fade).
  */
+const LIQUID = '.btn, .chip, .segmented button, .tabs button, .card, .spot-card, .top-card, .mode-card, select.input, .pack-head';
+
+/**
+ * Cursor-reactive parallax: eased --px / --py (-0.5…0.5) on <html>, read by CSS to shift
+ * destination photos and background layers. Fine pointers only; paused for reduced motion.
+ */
+function installParallax(reduced: () => boolean) {
+  const root = document.documentElement;
+  let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
+  const tick = () => {
+    raf = 0;
+    if (reduced()) { x = y = 0; } else { x += (tx - x) * 0.07; y += (ty - y) * 0.07; }
+    root.style.setProperty('--px', x.toFixed(4));
+    root.style.setProperty('--py', y.toFixed(4));
+    if (Math.abs(tx - x) > 0.0005 || Math.abs(ty - y) > 0.0005) raf = requestAnimationFrame(tick);
+  };
+  addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
+    tx = e.clientX / innerWidth - 0.5; ty = e.clientY / innerHeight - 0.5;
+    if (!raf) raf = requestAnimationFrame(tick);
+  }, { passive: true });
+  document.addEventListener('pointerleave', () => { tx = ty = 0; if (!raf) raf = requestAnimationFrame(tick); });
+}
+
 export function installInteractions() {
   const fine = window.matchMedia('(pointer: fine)').matches;
   const reduced = () => document.documentElement.dataset.motion === 'reduced';
@@ -28,17 +52,20 @@ export function installInteractions() {
   });
 
   if (!fine) return;
+  installParallax(reduced);
 
   let raf = 0;
   document.addEventListener('pointermove', (e) => {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
       const target = e.target as HTMLElement;
-      const glass = target.closest<HTMLElement>('.glass');
-      if (glass) {
-        const r = glass.getBoundingClientRect();
-        glass.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
-        glass.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+      // Liquid-glass sheen: the light spot follows the pointer on glass panels and every control.
+      for (const sel of ['.glass', LIQUID]) {
+        const el = target.closest<HTMLElement>(sel);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        el.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+        el.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
       }
       if (reduced()) return;
       const mag = target.closest<HTMLElement>('[data-magnetic]');
