@@ -1,3 +1,4 @@
+import { PackingChecklist } from '../components/PackingChecklist';
 import { useMemo, useState } from 'react';
 import { COMPANY, PRICING_BASIS } from '../config/company';
 import { DEPARTURE_CITIES, getDeparture, INTEREST_LABELS, MONTHS, mustDestination, searchDestinations } from '../data/catalog';
@@ -349,7 +350,7 @@ export default function Planner() {
   const saveDraft = useStore((s) => s.saveDraft);
   const regenerate = useStore((s) => s.regenerate);
   const money = useMoney();
-  const [tab, setTab] = useState<'itinerary' | 'estimate' | 'route'>('itinerary');
+  const [tab, setTab] = useState<'itinerary' | 'estimate' | 'route' | 'packing'>('itinerary');
   const [name, setName] = useState(draft.name);
   const c = draft.config;
   const errors = validateConfig(c);
@@ -418,9 +419,9 @@ export default function Planner() {
 
             <div className="row between no-print">
               <div className="tabs" role="tablist" aria-label="Plan views">
-                {(['itinerary', 'estimate', 'route'] as const).map((t) => (
+                {(['itinerary', 'estimate', 'route', 'packing'] as const).map((t) => (
                   <button key={t} role="tab" id={`tab-${t}`} aria-selected={tab === t} aria-controls={`panel-${t}`} onClick={() => setTab(t)}>
-                    {t === 'itinerary' ? 'Day-by-day plan' : t === 'estimate' ? 'Expense breakdown' : 'Route map'}
+                    {t === 'itinerary' ? 'Day-by-day plan' : t === 'estimate' ? 'Expense breakdown' : t === 'route' ? 'Route map' : 'What to carry'}
                   </button>
                 ))}
               </div>
@@ -498,6 +499,14 @@ export default function Planner() {
                   </details>
                 </div>
                 <div className="glass panel pad"><BudgetMeter config={c} perPerson={est.perPerson} onBudget={(v) => setConfig({ budgetPerPersonINR: v }, { regenerate: false })} /></div>
+              </section>
+            )}
+
+            {tab === 'packing' && (
+              <section id="panel-packing" role="tabpanel" aria-labelledby="tab-packing" className="glass panel pad stack">
+                <h2 style={{ fontSize: '1.4rem', margin: 0 }}>What to carry — documents, clothes & essentials</h2>
+                <p className="small muted" style={{ margin: 0 }}>Built from this plan: destination, dates, transport, travellers and activities. It updates when you change anything.</p>
+                <PackingChecklist c={c} />
               </section>
             )}
 

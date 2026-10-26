@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { PackingChecklist } from '../components/PackingChecklist';
 import { getDeparture, getDestination, INTEREST_LABELS, KIND_LABEL, MONTHS } from '../data/catalog';
 import type { BudgetTier, Destination } from '../data/types';
 import { getService } from '../data/services';
@@ -69,7 +71,27 @@ function Packages({ d }: { d: Destination }) {
       return { ...p, c, e };
     });
   }, [d]);
+  const [pack, setPack] = useState<(typeof pkgs)[number] | null>(null);
+  useEffect(() => {
+    if (!pack) return;
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && setPack(null);
+    addEventListener('keydown', k);
+    return () => removeEventListener('keydown', k);
+  }, [pack]);
   return (
+    <>
+    {pack && createPortal(
+      <div className="drawer" onClick={() => setPack(null)}>
+        <div className="drawer-panel glass panel pad pack-drawer" role="dialog" aria-modal="true" aria-labelledby="pack-title" onClick={(e) => e.stopPropagation()}>
+          <div className="row between" style={{ marginBottom: '.8rem' }}>
+            <div><span className="eyebrow" style={{ marginBottom: '.2rem' }}>{pack.name} · {pack.days} days</span><h2 id="pack-title" style={{ fontSize: '1.4rem', margin: 0 }}>What to carry to {d.name}</h2></div>
+            <button className="btn btn-sm btn-icon" aria-label="Close" onClick={() => setPack(null)}>✕</button>
+          </div>
+          <PackingChecklist c={pack.c} compact />
+        </div>
+      </div>,
+      document.body,
+    )}
     <div className="grid grid-3">
       {pkgs.map((p) => (
         <div key={p.name} className="glass pad stack" data-tilt>
@@ -79,9 +101,11 @@ function Packages({ d }: { d: Destination }) {
           <div><span className="big" style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem' }}>{money(p.e.perPerson)}</span> <span className="small muted">per person (est.)</span></div>
           <p className="tiny muted" style={{ margin: 0 }}>Range {money(p.e.low)} – {money(p.e.high)} total · illustrative</p>
           <button className="btn btn-primary btn-sm" onClick={() => { startPlan(p.c); navigate('/plan'); }}>Customise this package</button>
+          <button className="btn btn-sm" onClick={() => setPack(p)}>🧳 What to carry & documents</button>
         </div>
       ))}
     </div>
+    </>
   );
 }
 

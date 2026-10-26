@@ -1,3 +1,4 @@
+import { PackingChecklist } from '../components/PackingChecklist';
 import { useMemo, useState } from 'react';
 import { COMPANY, PRICING_BASIS } from '../config/company';
 import { getDeparture, mustDestination } from '../data/catalog';
@@ -317,6 +318,12 @@ export default function Trip() {
         </section>
 
         <section className="glass panel pad" aria-labelledby="gt"><h2 id="gt" style={{ fontSize: '1.6rem' }}>Getting there</h2>{sameCity ? <p className="muted">You’re already in {d.name} — enjoy a staycation.</p> : <GettingThere c={c} d={d} leg={leg} options={options} />}</section>
+
+        <section className="glass panel pad stack" aria-labelledby="pack">
+          <h2 id="pack" style={{ fontSize: '1.6rem', margin: 0 }}>What to carry</h2>
+          <p className="small muted" style={{ margin: 0 }}>Documents, clothes and essentials for {c.days} day{c.days > 1 ? 's' : ''} in {d.name}{leg ? ` travelling by ${leg.mode}` : ''} — tick items off as you pack.</p>
+          <PackingChecklist c={c} />
+        </section>
 
         <section aria-labelledby="st"><h2 id="st" style={{ fontSize: '1.6rem' }}>Where to stay</h2><Stay c={c} d={d} onTier={(t) => set({ tier: t })} /></section>
 

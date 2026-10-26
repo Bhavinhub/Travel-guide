@@ -1,3 +1,4 @@
+import { PageDolly } from './components/PageDolly';
 import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { COMPANY } from './config/company';
 import { getDestination } from './data/catalog';
@@ -102,10 +103,29 @@ function NotFound() {
   );
 }
 
+/** Photo sets for each page's scroll-controlled 3D background (local 4K media ids). */
+const DOLLY: Record<string, string[]> = {
+  india: ['u-taj', 'u-kerala', 'u-pangong', 'udaipur', 'u-kedarnath'],
+  world: ['interlaken', 'u-maldives', 'kyoto', 'paris', 'new-york'],
+  honeymoon: ['u-maldives', 'udaipur', 'munnar', 'havelock', 'zermatt'],
+  weekend: ['coorg', 'nandi-hills', 'lonavala', 'mussoorie', 'pondicherry'],
+  nightlife: ['u-mumbai', 'n-tyo-shibuya', 'n-dxb-marina', 'n-sin-clarke', 'n-nyc-village'],
+  plan: ['u-kerala', 'leh', 'goa', 'jaipur', 'u-taj'],
+  trip: [], saved: ['ch-valley', 'darjeeling', 'srinagar', 'ooty'],
+  about: ['u-kedarnath', 'varanasi', 'hampi', 'u-taj'], contact: ['munnar', 'alleppey', 'shimla'],
+  terms: ['ch-forest', 'nainital', 'ch-valley'], privacy: ['ch-snow', 'gangtok', 'manali'], security: ['leh', 'srinagar', 'zermatt'],
+  status: ['singapore', 'dubai', 'tokyo'], community: ['m-holi', 'm-aarti', 'jaipur'], docs: ['rishikesh', 'kedarnath', 'nainital'],
+  place: ['ch-discover', 'ch-valley', 'ch-forest'],
+};
+
 export default function App() {
   const route = useDocumentState();
   const [key, sub] = route.parts;
   let page: ReactNode;
+  const draftDest = useStore((s) => s.draft.config.destIds[0]);
+  const dollyIds = key === 'destination' ? [sub ?? '', ...(getDestination(sub ?? '')?.nearby ?? [])]
+    : key === 'trip' ? [draftDest, ...(getDestination(draftDest)?.nearby ?? [])]
+    : DOLLY[key ?? ''] ?? ['ch-valley', 'ch-forest', 'u-kerala'];
   switch (key ?? '') {
     case '': page = <Home />; break;
     case 'india': page = <Explore scope="india" />; break;
@@ -134,6 +154,7 @@ export default function App() {
         </filter>
       </svg>
       <a className="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); document.getElementById('main')?.scrollIntoView(); }}>Skip to content</a>
+      <PageDolly ids={key ? dollyIds : []} />
       <Nav />
       <ErrorBoundary key={route.path}>
         <Suspense fallback={<main className="page" id="main"><div className="page-bg" /><div className="loader"><div className="spinner" /><p className="small">Loading…</p></div></main>}>

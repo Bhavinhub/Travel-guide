@@ -816,3 +816,43 @@ html[data-theme='light'] .chip[aria-pressed='true'], html[data-theme='light'] .c
 html[data-theme='light'] .eyebrow-rose { color: color-mix(in srgb, var(--rose) 45%, #5a1a14); }
 .trip-name { width: 100%; font-family: var(--font-display); font-size: clamp(1.15rem, 3vw, 2.1rem); font-weight: 600; background: transparent; border: 1px dashed rgba(255, 255, 255, .25); text-overflow: ellipsis; }
 html[data-theme='light'] .trip-name { background: transparent; border: 1px dashed rgba(13, 42, 34, .3); }
+
+/* ═══════════ What to carry checklist ═══════════ */
+.pack-progress { height: 8px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+.pack-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--sun, #f4b860)); transition: width .4s var(--ease); }
+html[data-theme='light'] .pack-progress { background: rgba(13,42,34,.1); }
+.pack-sec { border: 1px solid rgba(255,255,255,.1); border-radius: 16px; overflow: hidden; }
+html[data-theme='light'] .pack-sec { border-color: rgba(13,42,34,.12); background: rgba(255,255,255,.5); }
+.pack-head { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: .6rem; width: 100%; padding: .75rem 1rem; }
+.pack-head b { flex: 1; }
+.pack-head:hover { background: rgba(255,255,255,.05); }
+.pack-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pack-list { list-style: none; margin: 0; padding: 0 1rem .7rem; display: grid; gap: .15rem; }
+.pack-list label { display: flex; gap: .65rem; align-items: flex-start; padding: .45rem .3rem; border-radius: 10px; cursor: pointer; }
+.pack-list label:hover { background: rgba(255,255,255,.04); }
+.pack-list input { margin-top: .25rem; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.pack-list .is-done > label > span { opacity: .55; text-decoration: line-through; }
+.pack-list .qty { color: var(--accent); margin-right: .15rem; }
+html[data-theme='light'] .pack-list .qty { color: #1f6b47; }
+.pack-must { margin-left: .4rem; font-size: .68rem; padding: .05rem .45rem; vertical-align: middle; }
+.pack-why { display: block; margin-top: .15rem; text-decoration: none; }
+.pack-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: min(560px, 100%); overflow: auto; border-radius: 24px 0 0 24px; }
+@media print { .packing .btn, .pack-progress { display: none; } .pack-list { display: grid !important; } }
+
+/* ═══════════ Scroll-controlled 3D photo dolly behind every page ═══════════ */
+.page-dolly { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--midnight); pointer-events: none; }
+body:has(.page-dolly) .page-bg { display: none; }
+.pd-camera { position: absolute; inset: 0; perspective-origin: 50% 50%; }
+.pd-world { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
+.pd-layer { position: absolute; inset: -6%; backface-visibility: hidden; will-change: transform, opacity; }
+.pd-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pd-shade { position: absolute; inset: 0;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(5, 12, 20, .22), rgba(5, 12, 20, .62)), linear-gradient(180deg, rgba(5, 12, 20, .45), rgba(5, 12, 20, .2) 40%, rgba(5, 12, 20, .7)); }
+html[data-theme='light'] .pd-shade { background: radial-gradient(120% 90% at 50% 40%, rgba(241, 245, 242, .55), rgba(241, 245, 242, .86)), linear-gradient(180deg, rgba(241, 245, 242, .7), rgba(241, 245, 242, .5) 40%, rgba(241, 245, 242, .9)); }
+/* Text on the page sits over photos now: a soft lift keeps it crisp. */
+body:has(.page-dolly) main h1, body:has(.page-dolly) main .lead { text-shadow: 0 2px 22px rgba(0, 0, 0, .45); }
+html[data-theme='light'] body:has(.page-dolly) main h1, html[data-theme='light'] body:has(.page-dolly) main .lead { text-shadow: 0 2px 18px rgba(255, 255, 255, .8); }
+@media print { .page-dolly { display: none !important; } }
+body:has(.page-dolly) .romance-bg { background: radial-gradient(80% 60% at 80% 0%, rgba(242, 167, 160, .16), transparent 60%); }
+html[data-theme='light'] body:has(.page-dolly) .romance-bg { background: radial-gradient(80% 60% at 80% 0%, rgba(242, 167, 160, .2), transparent 60%); }
+.drawer:has(.pack-drawer), .drawer:has(.cookie-panel) { z-index: 300; }
