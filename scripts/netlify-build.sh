@@ -4,7 +4,8 @@
 set -euo pipefail
 REPO="${MEDIA_REPO:-Bhavinhub/Travel-guide}"
 REF="${MEDIA_REF:-main}"
-count=$(find public/media -type f 2>/dev/null | wc -l | tr -d ' ')
+count=0
+[ -d public/media ] && count=$(find public/media -type f | wc -l | tr -d ' ')
 if [ "$count" -lt 100 ]; then
   echo "Fetching media from github.com/$REPO@$REF …"
   mkdir -p public
