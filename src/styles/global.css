@@ -807,3 +807,12 @@ html[data-theme='light'] .footer-bar { border-color: rgba(13, 42, 34, .1); }
   .nav .wordmark { font-size: 1.15rem; }
 }
 @media (max-width: 340px) { .nav .wordmark { display: none; } }
+
+/* Sun mode legibility: deepen small accent labels and selected chips on light surfaces. */
+html[data-theme='light'] .eyebrow { color: color-mix(in srgb, var(--accent) 40%, #0b2a1d); }
+html[data-theme='light'] :is(.chapter, .dhero, .trip-hero, .top-card, .ring-card) .eyebrow { color: var(--accent); }
+html[data-theme='light'] .chip[aria-pressed='true'], html[data-theme='light'] .chip.is-on { background: #13221d; color: #fff; border-color: transparent; }
+.eyebrow-rose { color: var(--rose); }
+html[data-theme='light'] .eyebrow-rose { color: color-mix(in srgb, var(--rose) 45%, #5a1a14); }
+.trip-name { width: 100%; font-family: var(--font-display); font-size: clamp(1.15rem, 3vw, 2.1rem); font-weight: 600; background: transparent; border: 1px dashed rgba(255, 255, 255, .25); text-overflow: ellipsis; }
+html[data-theme='light'] .trip-name { background: transparent; border: 1px dashed rgba(13, 42, 34, .3); }

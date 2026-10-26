@@ -371,7 +371,7 @@ export default function Planner() {
           <div style={{ flex: '1 1 420px' }}>
             <h1 className="eyebrow" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem', margin: '0 0 0.8rem' }}>Build My Trip</h1>
             <label htmlFor="trip-name" className="sr-only">Trip name</label>
-            <input id="trip-name" className="input" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 3vw, 2.1rem)', background: 'transparent', border: '1px dashed rgba(255,255,255,0.2)', fontWeight: 600 }} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => useStore.setState({ draft: { ...draft, name } })} />
+            <input id="trip-name" className="input trip-name" title="Rename this trip" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => useStore.setState({ draft: { ...draft, name } })} />
             <p className="small muted" style={{ margin: '0.4rem 0 0' }}>{dests.map((d) => d.name).join(' → ')} · from {getDeparture(c.departureId).name} · {c.days} day{c.days > 1 ? 's' : ''} · {c.adults + c.children} traveller{c.adults + c.children > 1 ? 's' : ''}</p>
           </div>
           <div className="row no-print">

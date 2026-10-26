@@ -98,7 +98,7 @@ export default function Honeymoon() {
       <div className="wrap stack" style={{ gap: '2rem' }}>
         <header className="editorial">
           <div>
-            <span className="eyebrow" style={{ color: 'var(--rose)' }}>Honeymoon Escapes</span>
+            <span className="eyebrow eyebrow-rose">Honeymoon Escapes</span>
             <h1 style={{ fontSize: 'clamp(2.4rem, 5.5vw, 4.4rem)' }}>The beginning of every story deserves a beautiful setting.</h1>
             <p className="lead">Lake palaces, tea-hill hideaways, coral islands and Alpine villages — each with transparent estimates for the extras that make it yours.</p>
           </div>
