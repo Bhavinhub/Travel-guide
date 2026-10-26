@@ -5,6 +5,7 @@ import { estimateTrip } from '../lib/estimate';
 import { useRoute } from '../lib/router';
 import { storage, useMoney, useStore } from '../lib/store';
 import { PUBLIC_KEY, sealForCompany } from '../lib/crypto';
+import { firebaseEnabled, saveQuoteRequest } from '../lib/firebase';
 
 const LIMITS = { name: 80, email: 120, phone: 20, message: 2000 };
 
@@ -54,7 +55,14 @@ export default function Contact() {
     // Encrypt with Travel Guide's RSA public key when configured, so only the company can read it.
     const body = PUBLIC_KEY ? await sealForCompany(payload).catch(() => null) : payload;
     if (!body) { setStatus('error'); return; }
-    if (ENV.quoteEndpoint) {
+    if (firebaseEnabled) {
+      setStatus('sending');
+      try {
+        setStatus((await saveQuoteRequest(body, !!PUBLIC_KEY)) ? 'sent' : 'error');
+      } catch {
+        setStatus('error');
+      }
+    } else if (ENV.quoteEndpoint) {
       setStatus('sending');
       try {
         const r = await fetch(ENV.quoteEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', referrerPolicy: 'no-referrer' });
@@ -133,7 +141,7 @@ export default function Contact() {
           <label className="check"><input id="consent" type="checkbox" checked={f.consent} onChange={(e) => set('consent', e.target.checked)} aria-invalid={!!errors.consent} aria-describedby={errors.consent ? 'consent-err' : undefined} /> I agree that {COMPANY.name} may use these details to respond to my enquiry. *</label>
           {errors.consent && <span id="consent-err" className="error">{errors.consent}</span>}
           <button className="btn btn-primary" type="submit" disabled={status === 'sending'}>{status === 'sending' ? 'Sending…' : 'Request a quote'}</button>
-          <p id="form-note" className="tiny muted" style={{ margin: 0 }}>* Required. This is an enquiry, not a booking. {ENV.quoteEndpoint ? '' : 'Submissions currently stay on this device.'} {PUBLIC_KEY ? '🔒 Your details are encrypted in your browser (RSA-OAEP + AES-256-GCM) before they leave this page.' : ''}</p>
+          <p id="form-note" className="tiny muted" style={{ margin: 0 }}>* Required. This is an enquiry, not a booking. {ENV.quoteEndpoint || firebaseEnabled ? '' : 'Submissions currently stay on this device.'} {PUBLIC_KEY ? '🔒 Your details are encrypted in your browser (RSA-OAEP + AES-256-GCM) before they leave this page.' : ''}</p>
         </form>
       </div>
     </main>

@@ -1,0 +1,21 @@
+rules_version = '2';
+// Travel Guide — visitors may only submit quote requests. Nobody can read, list, edit or
+// delete them from the browser; the company reads them in the Firebase console or with the
+// Admin SDK (and decrypts encrypted ones offline with scripts/decrypt-quote.mjs).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /quoteRequests/{id} {
+      allow read, update, delete: if false;
+      allow create: if request.resource.data.keys().hasOnly(['v', 'encrypted', 'payload', 'createdAt'])
+        && request.resource.data.v == 1
+        && request.resource.data.encrypted is bool
+        && request.resource.data.payload is string
+        && request.resource.data.payload.size() > 10
+        && request.resource.data.payload.size() < 20000
+        && request.resource.data.createdAt == request.time;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

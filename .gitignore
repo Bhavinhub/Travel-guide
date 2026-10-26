@@ -6,3 +6,5 @@ dist
 keys/
 *.pem
 .claude/
+.netlify/
+.firebase/
