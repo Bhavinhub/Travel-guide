@@ -68,7 +68,7 @@ function useDocumentState() {
   }, [atmo]);
   useEffect(() => {
     const key = route.parts[0] ?? '';
-    const sub = key === 'destination' ? getDestination(route.parts[1] ?? '')?.name : TITLES[key];
+    const sub = key === 'destination' ? getDestination(route.parts[1] ?? '')?.name : key === 'place' ? route.query.get('name') ?? TITLES[key] : TITLES[key];
     document.title = key ? `${sub ?? 'Page not found'} — ${COMPANY.name}` : `${COMPANY.name} — ${COMPANY.tagline}`;
     if (!route.query.get('section')) window.scrollTo({ top: 0, behavior: 'auto' });
   }, [route.path, route.parts[0] === 'place' ? route.query.toString() : '']); // eslint-disable-line react-hooks/exhaustive-deps
