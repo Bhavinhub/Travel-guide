@@ -212,7 +212,7 @@ export function Nav() {
         <div className="nav-tools">
           <NavSearch />
           <a className="btn btn-primary btn-sm hide-sm" href={href('/plan')} data-magnetic>Build My Trip</a>
-          <button className="btn btn-sm menu-btn" style={{ display: 'inline-flex' }} aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen(true)}>
+          <button className="btn btn-sm menu-btn" style={{ display: 'inline-flex' }} aria-label="Open menu" aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen(true)}>
             <span aria-hidden>☰</span> <span className="menu-label">Menu</span>
           </button>
           <ThemeToggle />
