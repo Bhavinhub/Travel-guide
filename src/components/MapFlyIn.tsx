@@ -365,6 +365,17 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       if (had) m.once('idle', () => { if (restingRef.current && !terrainOn.current && map.current === m) { terrainOn.current = true; m.setTerrain({ source: 'dem', exaggeration: 1.3 }); } });
     });
     ro.observe(el.current!);
+    // Imagery credit: required by the providers, so it stays — but folded into the small ⓘ (tap to read it).
+    let creditOpened = false;
+    const foldCredit = () => {
+      const a = el.current?.querySelector('.maplibregl-ctrl-attrib');
+      if (a && !creditOpened) a.classList.remove('maplibregl-compact-show');
+    };
+    m.on('load', () => {
+      foldCredit();
+      el.current?.querySelector('.maplibregl-ctrl-attrib-button')?.addEventListener('click', () => { creditOpened = !creditOpened; });
+    });
+    m.on('resize', () => requestAnimationFrame(foldCredit));
     // A tile that fails now and then (network hiccup) just retries on the next view — don't log it as an error.
     m.on('error', (e) => { const msg = String((e as { error?: Error }).error?.message ?? ''); if (!/fetch|tile|AJAX|aborted/i.test(msg)) console.warn('Map:', msg); });
     map.current = m;
