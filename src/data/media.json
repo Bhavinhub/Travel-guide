@@ -3660,20 +3660,38 @@
  },
  "kedarnath-day": {
   "article": "Kedarnath Temple",
-  "caption": "Kedarnath Temple below the snow peaks on a clear October morning",
+  "caption": "Kedarnath Temple under the snow peaks on a clear morning",
   "images": [
    {
-    "file": "File:Kedarnath temple in uttarakhand.jpg",
-    "width": 4000,
-    "height": 1800,
-    "author": "Nehasnaps0306",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Kedarnath_temple_in_uttarakhand.jpg",
+    "file": "Kedarnath Temple — Jai Shri Kedar, morning",
+    "width": 1125,
+    "height": 1500,
+    "author": "Photo supplied by the Travel Guide site owner",
+    "license": "Used with permission",
+    "licenseUrl": "",
+    "source": "https://travelguide-india.netlify.app/#/about",
     "sizes": {
      "960": "/media/kedarnath-day/0-960.jpg",
-     "1920": "/media/kedarnath-day/0-1920.jpg",
-     "3840": "/media/kedarnath-day/0-3840.jpg"
+     "1920": "/media/kedarnath-day/0-full.jpg"
+    }
+   }
+  ]
+ },
+ "badrinath-day": {
+  "article": "Badrinath Temple",
+  "caption": "Badrinath Temple on a bright day",
+  "images": [
+   {
+    "file": "Badrinath Temple, day",
+    "width": 2000,
+    "height": 1333,
+    "author": "Photo supplied by the Travel Guide site owner",
+    "license": "Used with permission",
+    "licenseUrl": "",
+    "source": "https://travelguide-india.netlify.app/#/about",
+    "sizes": {
+     "960": "/media/badrinath-day/0-960.jpg",
+     "1920": "/media/badrinath-day/0-full.jpg"
     }
    }
   ]

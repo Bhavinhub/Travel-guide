@@ -29,7 +29,7 @@ const CHAPTERS = [
 
 /** Real photographs per chapter (downloaded from Wikimedia Commons; see CREDITS.md). */
 export const STAGE: (StageChapter & { fx: Fx; ambience: Ambience })[] = [
-  { id: 'forest', media: 'kedarnath-day', focusY: 0.55, fallbackWiki: 'Kedarnath Temple', accent: '#f4dca0', fx: 'pollen', ambience: 'forest', depth: [{ media: 'u-kedarnath', label: 'Kedarnath at dusk' }, { media: 'm-peafowl', label: 'Indian peafowl' }] },
+  { id: 'forest', media: 'kedarnath-day', focusY: 0.42, fallbackWiki: 'Kedarnath Temple', accent: '#f4dca0', fx: 'pollen', ambience: 'forest', depth: [{ media: 'badrinath-day', label: 'Badrinath Temple' }, { media: 'u-kedarnath', label: 'Kedarnath at dusk' }] },
   { id: 'rainforest', media: 'u-kerala', fallbackWiki: 'Athirappilly Falls', accent: '#5fbf86', fx: 'pollen', ambience: 'rain', depth: [{ media: 'm-elephant', label: 'Asian elephants' }, { media: 'm-backwaters', label: 'Kerala backwaters' }] },
   { id: 'valley', media: 'u-pangong', fallbackWiki: 'Kullu Valley', accent: '#a9d6ff', fx: 'pollen', ambience: 'wind', depth: [{ media: 'm-tahr', label: 'Nilgiri tahr' }, { media: 'manali', label: 'Manali' }] },
   { id: 'snow', media: 'ch-snow', fallbackWiki: 'Gurudongmar Lake', accent: '#dbeeff', fx: 'snow', ambience: 'wind', depth: [{ media: 'leh', label: 'Leh' }, { media: 'srinagar', index: 1, label: 'Kashmir' }] },
