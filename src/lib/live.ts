@@ -12,17 +12,19 @@ import { storage } from './store';
 export interface FxLive { inrPerUnit: Record<string, number>; date: string; source: string; fetchedAt: number }
 
 export async function fetchLiveFx(): Promise<FxLive | null> {
-  const cached = storage.get<FxLive | null>('tg.fxLive', null);
+  const cached = storage.get<FxLive | null>('tg.fxLive2', null);
   if (cached && Date.now() - cached.fetchedAt < 6 * 3600_000) return cached;
   try {
-    const r = await fetch('https://api.frankfurter.dev/v1/latest?base=INR&symbols=USD,EUR,GBP,SGD,THB,JPY');
+    const r = await fetch('https://api.frankfurter.dev/v1/latest?base=INR&symbols=USD,EUR,GBP,SGD,THB,JPY,AUD,CAD,NZD,CHF,CNY,HKD,MYR,IDR,PHP,KRW,ZAR,SEK,NOK,DKK,PLN,TRY,ILS,BRL,MXN');
     if (!r.ok) throw new Error(String(r.status));
     const j = await r.json();
     const inrPerUnit: Record<string, number> = { INR: 1 };
     Object.entries(j.rates as Record<string, number>).forEach(([k, v]) => (inrPerUnit[k] = +(1 / v).toFixed(4)));
-    if (inrPerUnit.USD) inrPerUnit.AED = +(inrPerUnit.USD / 3.6725).toFixed(4);
+    // Currencies pegged to the US dollar or the rupee (not published by the ECB).
+    if (inrPerUnit.USD) { inrPerUnit.AED = +(inrPerUnit.USD / 3.6725).toFixed(4); inrPerUnit.SAR = +(inrPerUnit.USD / 3.75).toFixed(4); inrPerUnit.QAR = +(inrPerUnit.USD / 3.64).toFixed(4); }
+    inrPerUnit.NPR = 0.625; // 1.6 NPR = 1 INR (fixed peg)
     const live = { inrPerUnit, date: j.date, source: 'European Central Bank via Frankfurter', fetchedAt: Date.now() };
-    storage.set('tg.fxLive', live);
+    storage.set('tg.fxLive2', live);
     return live;
   } catch {
     return cached;

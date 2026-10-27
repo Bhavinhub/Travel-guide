@@ -68,6 +68,19 @@ const guardImg = (d: HTMLElement) => {
   if (!img || !img.getAttribute('src')) fail(); else img.addEventListener('error', fail, { once: true });
 };
 
+/** The device's position, named by its town (OpenStreetMap Nominatim reverse geocoding). */
+async function currentPlace(): Promise<MapOrigin> {
+  const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 }));
+  const { latitude: lat, longitude: lon } = pos.coords;
+  let name = 'My location';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&accept-language=en`);
+    const a = (await r.json())?.address ?? {};
+    name = a.city || a.town || a.village || a.municipality || a.county || a.state_district || a.state || name;
+  } catch { /* keep the generic name */ }
+  return { name, lat, lon };
+}
+
 interface Route {
   pts: [number, number][]; cum: number[]; mode: 'road' | 'air'; km: number; hours?: number;
   /** Where the road ends and a footpath continues (index into pts), e.g. the Kedarnath trek. */
@@ -685,6 +698,26 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     setSavedMsg(n ? `Saved ${n.toLocaleString('en-IN')} map tiles — this journey now works offline.` : 'Could not save right now — try again when online.');
   };
 
+  // ── Current location as the starting point: a button, and automatic once the visitor has allowed it. ──
+  const [locating, setLocating] = useState(false);
+  const [locMsg, setLocMsg] = useState('');
+  const locate = async (fromButton: boolean) => {
+    if (!('geolocation' in navigator)) { if (fromButton) setLocMsg('Location is not available on this device.'); return; }
+    setLocating(true); setLocMsg('');
+    try {
+      const here = await currentPlace();
+      autoplay.current = fromButton;
+      setCustom((c) => ({ ...c, from: here }));
+    } catch (e) {
+      if (fromButton) setLocMsg((e as GeolocationPositionError)?.code === 1 ? 'Location permission was declined — type your city in From instead.' : 'Could not find your location — type your city in From instead.');
+    } finally { setLocating(false); }
+  };
+  useEffect(() => {
+    // Already allowed (from an earlier visit)? Start from where the visitor is, without asking again.
+    navigator.permissions?.query({ name: 'geolocation' as PermissionName }).then((st) => { if (st.state === 'granted') locate(false); }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pLat, pLon]);
+
   const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
 
   const hm = (h = 0) => `${Math.floor(h)} h ${Math.round((h % 1) * 60)} min`;
@@ -705,6 +738,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         )}
         <form className="mapfly-route-form glass" onSubmit={(e) => e.preventDefault()} aria-label="Plan a route on the map">
           <PlaceInput label="From" value={from?.name ?? ''} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, from: p })); }} />
+          <button type="button" className="btn btn-sm mf-locate" onClick={() => locate(true)} disabled={locating} aria-label="Start from my current location" title="Start from my current location">{locating ? '…' : '◎'} <span>My location</span></button>
           <PlaceInput label="To" value={name} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, to: p })); }} />
           {(custom.from || custom.to) && <button type="button" className="btn btn-sm" onClick={() => setCustom({})} title="Back to this page's place" aria-label="Reset route">↺</button>}
         </form>
@@ -727,6 +761,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           <button className="btn btn-sm" onClick={saveOffline} disabled={saving !== null || !online} title="Download this journey's map so it works without internet">{saving !== null ? `Saving… ${Math.round(saving * 100)}%` : '↓ Save offline'}</button>
           <a className="btn btn-sm" href={from ? `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${lat},${lon}` : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`} target="_blank" rel="noreferrer">Directions ↗</a>
         </div>
+        {locMsg && <p className="mapfly-offline small" role="status" onClick={() => setLocMsg('')}>{locMsg}</p>}
         {!online && <p className="mapfly-offline small" role="status">Offline — showing the map saved on this device</p>}
         {savedMsg && <p className="mapfly-offline small is-ok" role="status" onClick={() => setSavedMsg('')}>{savedMsg}</p>}
         {(free || reduced) && (

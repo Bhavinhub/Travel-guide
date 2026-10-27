@@ -5,7 +5,8 @@ import { COMPANY } from './config/company';
 import { getDestination } from './data/catalog';
 import { Footer, Nav, Toast } from './components/Shell';
 import { useRoute } from './lib/router';
-import { ATMOSPHERES, useMotion, useStore } from './lib/store';
+import { ATMOSPHERES, firstCountryGuess, useMotion, useStore } from './lib/store';
+import { COUNTRIES } from './data/services';
 import Home from './pages/Home';
 import { fetchLiveFx } from './lib/live';
 
@@ -85,6 +86,14 @@ function useDocumentState() {
     document.title = key ? `${sub ?? 'Page not found'} — ${COMPANY.name}` : `${COMPANY.name} — ${COMPANY.tagline}`;
     if (!route.query.get('section')) window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior }); // instant: the CSS smooth scrolling would visibly roll the new page up
   }, [route.path, route.parts[0] === 'place' ? route.query.toString() : '']); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // A visitor from outside India is told once which currency the prices use, and where to change it.
+    const s = useStore.getState();
+    if (firstCountryGuess && s.prefs.country && s.prefs.country !== 'IN') {
+      const c = COUNTRIES.find((x) => x.code === s.prefs.country);
+      if (c) { s.setPrefs({ country: c.code }); s.notify(`Prices are shown in ${c.currency} for ${c.name}. Change your country in the ☰ menu.`); }
+    } else if (firstCountryGuess) s.setPrefs({ country: s.prefs.country ?? 'IN' });
+  }, []);
   useEffect(() => {
     // Live ECB exchange rates replace the reference rates (manual edits still possible in the planner).
     fetchLiveFx().then((fx) => {

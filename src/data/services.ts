@@ -30,15 +30,90 @@ export const getService = (id: string) => SERVICES.find((s) => s.id === id);
 /** Local guide, per group per day (INR), India base; international scaled by price level. */
 export const GUIDE_DAY_INR = { half: 1800, full: 3000 };
 
-/** Display currencies. Rates are editable illustrative references, NOT live. INR per 1 unit. */
+/** Display currencies. INR per 1 unit: reference values, replaced by live ECB rates where available. */
 export const CURRENCIES = [
   { code: 'INR', symbol: '₹', inrPerUnit: 1 },
   { code: 'USD', symbol: '$', inrPerUnit: 88 },
   { code: 'EUR', symbol: '€', inrPerUnit: 102 },
   { code: 'GBP', symbol: '£', inrPerUnit: 117 },
   { code: 'AED', symbol: 'AED ', inrPerUnit: 24 },
+  { code: 'SAR', symbol: 'SAR ', inrPerUnit: 23.5 },
+  { code: 'QAR', symbol: 'QAR ', inrPerUnit: 24.2 },
   { code: 'SGD', symbol: 'S$', inrPerUnit: 68 },
   { code: 'THB', symbol: '฿', inrPerUnit: 2.7 },
   { code: 'JPY', symbol: '¥', inrPerUnit: 0.58 },
+  { code: 'AUD', symbol: 'A$', inrPerUnit: 58 },
+  { code: 'CAD', symbol: 'C$', inrPerUnit: 64 },
+  { code: 'NZD', symbol: 'NZ$', inrPerUnit: 53 },
+  { code: 'CHF', symbol: 'CHF ', inrPerUnit: 110 },
+  { code: 'CNY', symbol: 'CN¥', inrPerUnit: 12.3 },
+  { code: 'HKD', symbol: 'HK$', inrPerUnit: 11.3 },
+  { code: 'MYR', symbol: 'RM', inrPerUnit: 20.5 },
+  { code: 'IDR', symbol: 'Rp', inrPerUnit: 0.0054 },
+  { code: 'PHP', symbol: '₱', inrPerUnit: 1.52 },
+  { code: 'KRW', symbol: '₩', inrPerUnit: 0.064 },
+  { code: 'NPR', symbol: 'NPR ', inrPerUnit: 0.625 },
+  { code: 'LKR', symbol: 'LKR ', inrPerUnit: 0.29 },
+  { code: 'BDT', symbol: '৳', inrPerUnit: 0.72 },
+  { code: 'ZAR', symbol: 'R', inrPerUnit: 4.9 },
+  { code: 'SEK', symbol: 'kr ', inrPerUnit: 9.3 },
+  { code: 'NOK', symbol: 'kr ', inrPerUnit: 8.7 },
+  { code: 'DKK', symbol: 'kr ', inrPerUnit: 13.7 },
+  { code: 'PLN', symbol: 'zł ', inrPerUnit: 24 },
+  { code: 'TRY', symbol: '₺', inrPerUnit: 2.2 },
+  { code: 'ILS', symbol: '₪', inrPerUnit: 24 },
+  { code: 'BRL', symbol: 'R$', inrPerUnit: 16 },
+  { code: 'MXN', symbol: 'MX$', inrPerUnit: 4.8 },
 ] as const;
 export type CurrencyCode = (typeof CURRENCIES)[number]['code'];
+
+/** Visitor countries: prices across the site are shown in the selected country's currency. */
+export const COUNTRIES: { code: string; name: string; currency: CurrencyCode }[] = [
+  { code: 'IN', name: 'India', currency: 'INR' }, { code: 'US', name: 'United States', currency: 'USD' },
+  { code: 'GB', name: 'United Kingdom', currency: 'GBP' }, { code: 'AE', name: 'United Arab Emirates', currency: 'AED' },
+  { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' }, { code: 'QA', name: 'Qatar', currency: 'QAR' },
+  { code: 'SG', name: 'Singapore', currency: 'SGD' }, { code: 'TH', name: 'Thailand', currency: 'THB' },
+  { code: 'JP', name: 'Japan', currency: 'JPY' }, { code: 'AU', name: 'Australia', currency: 'AUD' },
+  { code: 'CA', name: 'Canada', currency: 'CAD' }, { code: 'NZ', name: 'New Zealand', currency: 'NZD' },
+  { code: 'DE', name: 'Germany', currency: 'EUR' }, { code: 'FR', name: 'France', currency: 'EUR' },
+  { code: 'IT', name: 'Italy', currency: 'EUR' }, { code: 'ES', name: 'Spain', currency: 'EUR' },
+  { code: 'NL', name: 'Netherlands', currency: 'EUR' }, { code: 'IE', name: 'Ireland', currency: 'EUR' },
+  { code: 'PT', name: 'Portugal', currency: 'EUR' }, { code: 'AT', name: 'Austria', currency: 'EUR' },
+  { code: 'BE', name: 'Belgium', currency: 'EUR' }, { code: 'GR', name: 'Greece', currency: 'EUR' },
+  { code: 'FI', name: 'Finland', currency: 'EUR' }, { code: 'CH', name: 'Switzerland', currency: 'CHF' },
+  { code: 'SE', name: 'Sweden', currency: 'SEK' }, { code: 'NO', name: 'Norway', currency: 'NOK' },
+  { code: 'DK', name: 'Denmark', currency: 'DKK' }, { code: 'PL', name: 'Poland', currency: 'PLN' },
+  { code: 'CN', name: 'China', currency: 'CNY' }, { code: 'HK', name: 'Hong Kong', currency: 'HKD' },
+  { code: 'MY', name: 'Malaysia', currency: 'MYR' }, { code: 'ID', name: 'Indonesia', currency: 'IDR' },
+  { code: 'PH', name: 'Philippines', currency: 'PHP' }, { code: 'KR', name: 'South Korea', currency: 'KRW' },
+  { code: 'NP', name: 'Nepal', currency: 'NPR' }, { code: 'LK', name: 'Sri Lanka', currency: 'LKR' },
+  { code: 'BD', name: 'Bangladesh', currency: 'BDT' }, { code: 'ZA', name: 'South Africa', currency: 'ZAR' },
+  { code: 'TR', name: 'Türkiye', currency: 'TRY' }, { code: 'IL', name: 'Israel', currency: 'ILS' },
+  { code: 'BR', name: 'Brazil', currency: 'BRL' }, { code: 'MX', name: 'Mexico', currency: 'MXN' },
+];
+export const flagOf = (cc: string) => String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+
+const TZ_COUNTRY: Record<string, string> = {
+  'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN', 'Asia/Dubai': 'AE', 'Asia/Riyadh': 'SA', 'Asia/Qatar': 'QA', 'Asia/Singapore': 'SG',
+  'Asia/Bangkok': 'TH', 'Asia/Tokyo': 'JP', 'Asia/Shanghai': 'CN', 'Asia/Hong_Kong': 'HK', 'Asia/Kuala_Lumpur': 'MY',
+  'Asia/Jakarta': 'ID', 'Asia/Manila': 'PH', 'Asia/Seoul': 'KR', 'Asia/Kathmandu': 'NP', 'Asia/Colombo': 'LK', 'Asia/Dhaka': 'BD',
+  'Europe/London': 'GB', 'Europe/Dublin': 'IE', 'Europe/Paris': 'FR', 'Europe/Berlin': 'DE', 'Europe/Rome': 'IT', 'Europe/Madrid': 'ES',
+  'Europe/Amsterdam': 'NL', 'Europe/Lisbon': 'PT', 'Europe/Vienna': 'AT', 'Europe/Brussels': 'BE', 'Europe/Athens': 'GR',
+  'Europe/Helsinki': 'FI', 'Europe/Zurich': 'CH', 'Europe/Stockholm': 'SE', 'Europe/Oslo': 'NO', 'Europe/Copenhagen': 'DK',
+  'Europe/Warsaw': 'PL', 'Europe/Istanbul': 'TR', 'Asia/Jerusalem': 'IL', 'Africa/Johannesburg': 'ZA', 'America/Sao_Paulo': 'BR',
+  'America/Mexico_City': 'MX', 'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'Pacific/Auckland': 'NZ',
+};
+/** Best guess of the visitor's country from the device's time zone, then its language region. */
+export function detectCountry(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (TZ_COUNTRY[tz]) return TZ_COUNTRY[tz];
+    if (tz.startsWith('Australia/')) return 'AU';
+    if (tz.startsWith('America/')) return 'US';
+  } catch { /* fall through */ }
+  for (const l of navigator.languages ?? [navigator.language]) {
+    const region = l.split('-')[1]?.toUpperCase();
+    if (region && COUNTRIES.some((c) => c.code === region)) return region;
+  }
+  return 'IN';
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { COMPANY } from '../config/company';
 import { href, navigate, useRoute } from '../lib/router';
 import { useStore } from '../lib/store';
+import { COUNTRIES, flagOf, type CurrencyCode } from '../data/services';
 import { LogoMark, Wordmark } from './Logo';
 import { searchDestinations } from '../data/catalog';
 import { localImages, srcOf } from '../lib/localMedia';
@@ -225,6 +226,7 @@ export function Nav() {
               <button ref={closeRef} className="btn btn-sm btn-icon" aria-label="Close menu" onClick={() => setOpen(false)}>✕</button>
             </div>
             <div className="drawer-search"><NavSearch id="menu-q" /></div>
+            <CountryPicker />
             <nav aria-label="All sections">
               {NAV.map((n) => (
                 <a key={n.to} href={href(n.to)} aria-current={isCurrent(path, n.to) ? 'page' : undefined}>{n.label}</a>
@@ -243,7 +245,7 @@ const STORE_GROUPS = [
   { id: 'trips', label: 'Saved trips & passport', detail: 'Plans you saved and destination stamps.', keys: ['tg.trips', 'tg.passport'] },
   { id: 'draft', label: 'Current plan', detail: 'The trip you are editing.', keys: ['tg.draft'] },
   { id: 'search', label: 'Recent searches & place guides', detail: 'Places you searched for.', keys: ['tg.recentSearches', 'tg.places'] },
-  { id: 'cache', label: 'Cached data', detail: 'Exchange rates and quote requests saved on this device.', keys: ['tg.fxLive', 'tg.quoteRequests', 'tg.lastQuote'] },
+  { id: 'cache', label: 'Cached data', detail: 'Exchange rates and quote requests saved on this device.', keys: ['tg.fxLive2', 'tg.quoteRequests', 'tg.lastQuote'] },
 ];
 
 /** Shows exactly what is stored in this browser and lets the visitor clear it. */
@@ -368,4 +370,20 @@ export function Toast() {
 
 export function go(to: string) {
   navigate(to);
+}
+
+/** Your country: every price on the site is shown in its currency (live exchange rates). */
+function CountryPicker() {
+  const country = useStore((s) => s.prefs.country) ?? 'IN';
+  const currency = useStore((s) => s.prefs.currency);
+  const setPrefs = useStore((s) => s.setPrefs);
+  return (
+    <label className="drawer-country">
+      <span className="tiny muted">Your country · prices shown in <b>{currency}</b></span>
+      <select className="input" value={country} aria-label="Your country"
+        onChange={(e) => { const c = COUNTRIES.find((x) => x.code === e.target.value); if (c) setPrefs({ country: c.code, currency: c.currency as CurrencyCode }); }}>
+        {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{flagOf(c.code)} {c.name} ({c.currency})</option>)}
+      </select>
+    </label>
+  );
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CURRENCIES, type CurrencyCode } from '../data/services';
+import { COUNTRIES, CURRENCIES, detectCountry, type CurrencyCode } from '../data/services';
 import { generateItinerary } from './itinerary';
 import { defaultConfig, uid, type DayPlan, type Trip, type TripConfig } from './trip';
 
@@ -42,6 +42,7 @@ export interface Prefs {
   volume: number;
   currency: CurrencyCode;
   fx: Record<string, number>; // INR per unit, editable
+  country?: string; // visitor's country (ISO code); prices follow its currency
 }
 
 const systemReduced = () => {
@@ -98,7 +99,15 @@ interface State {
   notify: (msg: string | null) => void;
 }
 
-const loadedPrefs = { ...defaultPrefs, ...storage.get<Partial<Prefs>>('tg.prefs', {}) };
+const savedPrefs = storage.get<Partial<Prefs>>('tg.prefs', {});
+const loadedPrefs: Prefs = { ...defaultPrefs, ...savedPrefs, fx: { ...defaultPrefs.fx, ...(savedPrefs.fx ?? {}) } };
+// First visit: show prices in the visitor's own currency (they can change country any time in the menu).
+export const firstCountryGuess = !savedPrefs.country;
+if (!savedPrefs.country) {
+  const cc = detectCountry();
+  loadedPrefs.country = cc;
+  if (!savedPrefs.currency || savedPrefs.currency === 'INR') loadedPrefs.currency = COUNTRIES.find((c) => c.code === cc)?.currency ?? 'INR';
+}
 // Audio always starts silent: the remembered preference only offers a quick resume.
 const initialPrefs: Prefs = { ...loadedPrefs, audioEnabled: false };
 const rememberedAudio = loadedPrefs.audioEnabled;
@@ -225,12 +234,14 @@ export function useMoney() {
 }
 
 export function formatMoney(inr: number, currency: CurrencyCode, fx: Record<string, number>, opts: { compact?: boolean } = {}) {
-  const rate = fx[currency] || 1;
+  const rate = fx[currency] || CURRENCIES.find((c) => c.code === currency)?.inrPerUnit || 1;
   const v = inr / rate;
-  const info = CURRENCIES.find((c) => c.code === currency)!;
-  const digits = currency === 'INR' || currency === 'JPY' || currency === 'THB' ? 0 : 0;
-  const n = opts.compact && v >= 100000
-    ? new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en', { notation: 'compact', maximumFractionDigits: 1 }).format(v)
-    : new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en', { maximumFractionDigits: digits }).format(Math.round(v));
-  return `${info.symbol}${n}`;
+  const compact = opts.compact && v >= 100000;
+  try {
+    // Each currency written the way its own users read it (₹1,23,456 · $1,234 · €1.234 → shown in English digits).
+    return new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol', maximumFractionDigits: compact ? 1 : 0, ...(compact ? { notation: 'compact' as const } : {}) }).format(compact ? v : Math.round(v));
+  } catch {
+    const info = CURRENCIES.find((c) => c.code === currency);
+    return `${info?.symbol ?? currency + ' '}${Math.round(v).toLocaleString('en')}`;
+  }
 }

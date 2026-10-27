@@ -17,6 +17,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <!-- Netlify Forms reads this at deploy time: quote requests also arrive in the Forms inbox and as email notifications. -->
+    <form name="quote" data-netlify="true" netlify-honeypot="website" hidden>
+      <input name="name" /><input name="email" /><input name="phone" /><input name="country" /><input name="website" />
+      <textarea name="message"></textarea><textarea name="plan"></textarea>
+    </form>
     <noscript>
       <div style="padding:2rem;font-family:system-ui">Travel Guide needs JavaScript for the trip planner. Please enable it to continue.</div>
     </noscript>
