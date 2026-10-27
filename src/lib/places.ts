@@ -18,6 +18,9 @@ export interface PlaceHit {
   /** Wikipedia article title for topics. */
   title?: string;
   detail?: string;
+  thumb?: string;
+  /** Came from a spelling suggestion (\"did you mean\"). */
+  suggested?: boolean;
 }
 
 export interface WikiSummary {
@@ -77,11 +80,90 @@ export async function geocode(q: string, signal?: AbortSignal): Promise<PlaceHit
   }));
 }
 
-/** Wikipedia titles (people, landmarks, anything) for the query. */
+interface GenPage { title: string; description?: string; index?: number; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string } }
+
+/** Wikipedia full-text search (people, temples, ashrams, landmarks…) with typo correction. */
 export async function wikiSearch(q: string, signal?: AbortSignal): Promise<PlaceHit[]> {
-  const j = await getJSON<{ pages: { title: string; description?: string }[] }>(
-    `${WIKI}/w/rest.php/v1/search/title?q=${encodeURIComponent(q)}&limit=5`, signal);
-  return (j.pages ?? []).map((p) => ({ kind: 'topic' as const, name: p.title, title: p.title, detail: p.description }));
+  const run = async (term: string) => getJSON<{ query?: { pages?: Record<string, GenPage>; searchinfo?: { suggestion?: string } } }>(
+    `${WIKI}/w/api.php?action=query&format=json&origin=*&list=search&srsearch=${encodeURIComponent(term)}&srinfo=suggestion&srlimit=1` +
+    `&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=6&prop=description|coordinates|pageimages&piprop=thumbnail&pithumbsize=160`, signal);
+  const toHits = (pages: Record<string, GenPage> = {}) => Object.values(pages)
+    .sort((x, y) => (x.index ?? 0) - (y.index ?? 0))
+    .filter((p) => !/disambiguation/i.test(p.description ?? ''))
+    .map((p): PlaceHit => ({
+      kind: p.coordinates?.[0] ? 'place' : 'topic', name: p.title, title: p.title, detail: p.description, thumb: p.thumbnail?.source,
+      lat: p.coordinates?.[0]?.lat, lon: p.coordinates?.[0]?.lon,
+    }));
+  // Exact and fuzzy ("Kanchi~ Dham~" also finds "Kainchi Dham") searches run together.
+  const fuzzy = q.trim().split(/\s+/).filter((w) => w.length > 2).map((w) => `${w.replace(/[~"]/g, '')}~`).join(' ');
+  const [j, f] = await Promise.all([run(q), fuzzy ? run(fuzzy).catch(() => null) : Promise.resolve(null)]);
+  const all = [...toHits(j.query?.pages), ...toHits(f?.query?.pages)].filter((h, i, arr) => arr.findIndex((x) => x.title === h.title) === i);
+  let hits = all
+    .map((h, i) => ({ h, score: similarity(q, h.name) + (i < 3 ? 0.05 : 0) }))
+    .sort((x, y) => y.score - x.score)
+    .map(({ h }) => h);
+  const best = hits[0];
+  if (best && best.name.toLowerCase() !== q.trim().toLowerCase() && similarity(q, best.name) > 0.75) hits[0] = { ...best, suggested: true };
+  const suggestion = j.query?.searchinfo?.suggestion;
+  // Wikipedia's own "did you mean" when it has one.
+  if (suggestion && suggestion.toLowerCase() !== q.trim().toLowerCase() && !hits.some((h) => h.name.toLowerCase() === suggestion.toLowerCase())) {
+    const k = await run(suggestion).catch(() => null);
+    const extra = toHits(k?.query?.pages).map((h) => ({ ...h, suggested: true }));
+    hits = [...extra.slice(0, 2), ...hits.filter((h) => !extra.some((e) => e.title === h.title))];
+  }
+  return hits.slice(0, 8);
+}
+
+/** 0…1 closeness of two names (Levenshtein on lower-case letters), tolerant of small typos. */
+function similarity(a: string, b: string) {
+  const x = a.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim(), y = b.toLowerCase().replace(/\s*\(.*\)/, '').replace(/[^a-z0-9 ]/g, '').trim();
+  if (!x || !y) return 0;
+  if (x === y) return 1;
+  const d: number[] = Array.from({ length: y.length + 1 }, (_, k) => k);
+  for (let i = 1; i <= x.length; i++) {
+    let prev = d[0]; d[0] = i;
+    for (let k = 1; k <= y.length; k++) {
+      const t = d[k];
+      d[k] = Math.min(d[k] + 1, d[k - 1] + 1, prev + (x[i - 1] === y[k - 1] ? 0 : 1));
+      prev = t;
+    }
+  }
+  return 1 - d[y.length] / Math.max(x.length, y.length);
+}
+
+/** Wikipedia entries that are not places a traveller visits. */
+const NOT_TOURISTY = /country in|state in|state of|union territory|district of|district in|newspaper|magazine|province|legislat|parliament|rajya sabha|lok sabha|ministry|government|court|college|school|university|institute|company|bank|hospital|office|constituency|railway|station|political party|district$|tehsil|census town|television|radio|cricket|stadium|police|cantonment|headquarters|embassy|airport|metro/i;
+const SACRED_OR_SCENIC = /temple|ashram|mandir|shrine|math\b|monastery|gompa|mosque|dargah|gurudwara|church|cathedral|ghat|peak|lake|falls|fort|palace|hill|valley|national park|sanctuary|beach|town|city|village|pilgrim/i;
+
+/** Places linked from an article that have coordinates — e.g. the ashrams and temples connected with a person —
+ *  ranked by how often the article mentions them, preferring sacred and scenic places. */
+export async function connectedPlaces(title: string, signal?: AbortSignal): Promise<NearbySpot[]> {
+  try {
+    const [links, text] = await Promise.all([
+      getJSON<{ query?: { pages?: Record<string, GenPage> } }>(
+        `${WIKI}/w/api.php?action=query&format=json&origin=*&generator=links&titles=${encodeURIComponent(title)}&gplnamespace=0&gpllimit=300&prop=coordinates|pageimages|description&piprop=thumbnail&pithumbsize=1280&colimit=300`, signal),
+      getJSON<{ query?: { pages?: Record<string, { extract?: string }> } }>(
+        `${WIKI}/w/api.php?action=query&format=json&origin=*&prop=extracts&explaintext=1&titles=${encodeURIComponent(title)}`, signal)
+        .then((j) => Object.values(j.query?.pages ?? {})[0]?.extract ?? '').catch(() => ''),
+    ]);
+    const body = text.toLowerCase();
+    const mentions = (t: string) => {
+      const key = t.split(/[,(]/)[0].trim().toLowerCase();
+      if (key.length < 3) return 0;
+      let n = 0, i = body.indexOf(key);
+      while (i !== -1 && n < 20) { n++; i = body.indexOf(key, i + key.length); }
+      return n;
+    };
+    return Object.values(links.query?.pages ?? {})
+      .filter((p) => p.coordinates?.[0] && !NOT_TOURISTY.test(`${p.title} ${p.description ?? ''}`))
+      .map((p) => ({ p, score: mentions(p.title) * 2 + (SACRED_OR_SCENIC.test(`${p.title} ${p.description ?? ''}`) ? 3 : 0) + (p.thumbnail ? 1 : 0) }))
+      .filter((x) => x.score >= 3)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 9)
+      .map(({ p }) => ({ title: p.title, description: p.description, lat: p.coordinates![0].lat, lon: p.coordinates![0].lon, image: p.thumbnail?.source, page: `${WIKI}/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`, dist: 0 }));
+  } catch {
+    return [];
+  }
 }
 
 /** Combined live search; tolerant of one source failing. */
@@ -135,13 +217,13 @@ export async function placeSummary(h: PlaceHit, signal?: AbortSignal): Promise<W
 export async function nearbySpots(lat: number, lon: number, signal?: AbortSignal): Promise<NearbySpot[]> {
   try {
     const j = await getJSON<{ query?: { pages: Record<string, { title: string; description?: string; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string }; index: number }> } }>(
-      `${WIKI}/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=10000&ggslimit=40&prop=coordinates|pageimages|description&piprop=thumbnail&pithumbsize=960`, signal);
+      `${WIKI}/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=10000&ggslimit=40&prop=coordinates|pageimages|description&piprop=thumbnail&pithumbsize=1280`, signal);
     const pages = Object.values(j.query?.pages ?? {});
     return pages
       .filter((p) => p.coordinates?.[0])
       .map((p) => ({ title: p.title, description: p.description, lat: p.coordinates![0].lat, lon: p.coordinates![0].lon, image: p.thumbnail?.source, page: `${WIKI}/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`, dist: kmBetween({ lat, lon }, p.coordinates![0]) }))
       // Prefer spots that have a photo and are not administrative entries.
-      .filter((p) => !/^(List of|.* \(Vidhan Sabha constituency\)|.* \(Lok Sabha constituency\))/.test(p.title) && !/constituency|railway station|district$/i.test(p.description ?? ''))
+      .filter((p) => !/^List of/.test(p.title) && !NOT_TOURISTY.test(`${p.title} ${p.description ?? ''}`))
       .sort((a, b) => Number(!!b.image) - Number(!!a.image) || a.dist - b.dist)
       .slice(0, 12);
   } catch {

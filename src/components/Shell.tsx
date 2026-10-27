@@ -82,8 +82,8 @@ function NavSearch({ id = 'nav-q' }: { id?: string }) {
             const sub = [h.region, h.country].filter(Boolean).join(', ');
             return (
               <a key={`${h.kind}-${h.name}-${h.lat ?? ''}`} href={href(placeHref(h))} role="option" onClick={(e) => { e.preventDefault(); go(placeHref(h), h.name, sub || h.detail); }}>
-                <span className="ph ico" aria-hidden>{h.kind === 'place' ? '📍' : '📖'}</span>
-                <span><b>{h.name}</b>{sub && <span className="tiny muted"> {sub}</span>}<br /><span className="tiny muted">{h.detail ?? (h.kind === 'place' ? 'Place' : 'Wikipedia')}</span></span>
+                {h.thumb ? <img src={h.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="ph ico" aria-hidden>{h.kind === 'place' ? '📍' : '📖'}</span>}
+                <span>{h.suggested && <span className="tag pack-must" style={{ marginLeft: 0, marginRight: '.35rem' }}>Did you mean</span>}<b>{h.name}</b>{sub && <span className="tiny muted"> {sub}</span>}<br /><span className="tiny muted">{h.detail ?? (h.kind === 'place' ? 'Place' : 'Wikipedia')}</span></span>
               </a>
             );
           })}

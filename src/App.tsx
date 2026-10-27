@@ -1,4 +1,4 @@
-import { PageDolly } from './components/PageDolly';
+import { PageDolly, useBackdrop } from './components/PageDolly';
 import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { COMPANY } from './config/company';
 import { getDestination } from './data/catalog';
@@ -70,8 +70,8 @@ function useDocumentState() {
     const key = route.parts[0] ?? '';
     const sub = key === 'destination' ? getDestination(route.parts[1] ?? '')?.name : TITLES[key];
     document.title = key ? `${sub ?? 'Page not found'} — ${COMPANY.name}` : `${COMPANY.name} — ${COMPANY.tagline}`;
-    if (key !== '' && !route.query.get('section')) window.scrollTo({ top: 0, behavior: 'auto' });
-  }, [route.path]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!route.query.get('section')) window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [route.path, route.parts[0] === 'place' ? route.query.toString() : '']); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Live ECB exchange rates replace the reference rates (manual edits still possible in the planner).
     fetchLiveFx().then((fx) => {
@@ -122,7 +122,10 @@ export default function App() {
   const route = useDocumentState();
   const [key, sub] = route.parts;
   let page: ReactNode;
+  // Place pages differ only by their query (?name=…), so include it: a new place remounts and opens at the top.
+  const routeKey = key === 'place' ? `${route.path}?${route.query.toString()}` : route.path;
   const draftDest = useStore((s) => s.draft.config.destIds[0]);
+  const placePhotos = useBackdrop((s) => s.photos);
   const dollyIds = key === 'destination' ? [sub ?? '', ...(getDestination(sub ?? '')?.nearby ?? [])]
     : key === 'trip' ? [draftDest, ...(getDestination(draftDest)?.nearby ?? [])]
     : DOLLY[key ?? ''] ?? ['ch-valley', 'ch-forest', 'u-kerala'];
@@ -154,11 +157,11 @@ export default function App() {
         </filter>
       </svg>
       <a className="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); document.getElementById('main')?.scrollIntoView(); }}>Skip to content</a>
-      <PageDolly ids={key ? dollyIds : []} />
+      <PageDolly ids={key && key !== 'place' ? dollyIds : []} photos={key === 'place' ? placePhotos : undefined} />
       <Nav />
-      <ErrorBoundary key={route.path}>
+      <ErrorBoundary key={routeKey}>
         <Suspense fallback={<main className="page" id="main"><div className="page-bg" /><div className="loader"><div className="spinner" /><p className="small">Loading…</p></div></main>}>
-          <div className={key ? 'route-stage' : undefined} key={route.path}>{page}</div>
+          <div className={key ? 'route-stage' : undefined} key={routeKey}>{page}</div>
         </Suspense>
       </ErrorBoundary>
       <Footer />

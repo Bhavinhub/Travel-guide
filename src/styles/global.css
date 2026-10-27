@@ -935,3 +935,7 @@ html[data-theme='light'] body:has(.page-dolly) .glass { background: rgba(255, 25
 .dhero .bg img.px-img, .trip-hero img.px-img { scale: 1.08; }
 @media (hover: none), (pointer: coarse) { .px-img { scale: none; translate: none !important; } }
 html[data-motion='reduced'] .px-img { scale: none; translate: none !important; }
+.why-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
+.why-list li { display: grid; grid-template-columns: 1.6rem 1fr; gap: .5rem; line-height: 1.55; }
+.why-list li > span:first-child { font-size: 1.1rem; }
+.place-intro { align-items: start; }

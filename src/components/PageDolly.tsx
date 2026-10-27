@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { create } from 'zustand';
 import { localImages, srcOf, srcSet } from '../lib/localMedia';
 import { useMotion } from '../lib/store';
 
@@ -12,16 +13,23 @@ import { useMotion } from '../lib/store';
  * only the two photos involved in the current transition are rendered, and every change is a
  * GPU-composited transform/opacity — no layout, no repaint, no blur over the moving image.
  */
-const ZOOM = 0.22; // how far the camera pushes into a photo before it hands over to the next
+const ZOOM = 0.22;
+
+export interface BackdropPhoto { src: string; srcSet?: string }
+/** Pages whose photos come from live sources (e.g. a searched place) publish them here. */
+export const useBackdrop = create<{ photos: BackdropPhoto[] }>(() => ({ photos: [] }));
+export const setBackdrop = (photos: BackdropPhoto[]) => useBackdrop.setState({ photos });
+ // how far the camera pushes into a photo before it hands over to the next
 
 /** `source` lets a page drive the camera itself (e.g. the home page's chapter progress, 0…n-1). */
-export function PageDolly({ ids, source }: { ids: string[]; source?: { progress: number } }) {
-  const imgs = ids.map((id) => localImages(id)[0]).filter(Boolean).slice(0, source ? 12 : 5);
+export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos?: BackdropPhoto[]; source?: { progress: number } }) {
+  const local = ids.map((id) => localImages(id)[0]).filter(Boolean).map((im) => ({ src: srcOf(im!, 'large')!, srcSet: srcSet(im!), key: im!.sizes['960'] ?? im!.file }));
+  const imgs = (photos?.length ? photos.map((p) => ({ ...p, key: p.src })) : local).filter((x, i, a) => a.findIndex((y) => y.key === x.key) === i).slice(0, source ? 12 : 5);
   const camera = useRef<HTMLDivElement>(null);
   const layers = useRef<(HTMLDivElement | null)[]>([]);
   const { reduced } = useMotion();
   const n = imgs.length;
-  const key = ids.join();
+  const key = imgs.map((i) => i.key).join();
 
   useEffect(() => {
     if (!n) return;
@@ -74,8 +82,8 @@ export function PageDolly({ ids, source }: { ids: string[]; source?: { progress:
     <div className="page-dolly" aria-hidden>
       <div ref={camera} className="pd-camera">
         {imgs.map((im, i) => (
-          <div key={im.sizes['960'] ?? i} ref={(el) => { layers.current[i] = el; }} className="pd-layer" style={i > 1 ? { display: 'none' } : undefined}>
-            <img src={srcOf(im, 'large')} srcSet={srcSet(im)} sizes="100vw" alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} />
+          <div key={im.key} ref={(el) => { layers.current[i] = el; }} className="pd-layer" style={i > 1 ? { display: 'none' } : undefined}>
+            <img src={im.src} srcSet={im.srcSet} sizes="100vw" alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" />
           </div>
         ))}
       </div>
