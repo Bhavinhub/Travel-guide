@@ -1,73 +1,83 @@
 import { useEffect, useRef } from 'react';
-import { localImages, srcOf } from '../lib/localMedia';
+import { localImages, srcOf, srcSet } from '../lib/localMedia';
 import { useMotion } from '../lib/store';
 
 /**
  * Scroll-controlled 3D camera dolly behind every page.
- * Real photographs stand one behind another in CSS 3D space. Scrolling down moves the
- * camera forward through them (each photo grows, then dissolves into the next scene);
- * scrolling up reverses the move. The cursor gently swings the camera. GPU-composited
- * transforms only — no WebGL needed — so it runs smoothly on every page and phone.
+ * Real photographs sit one behind another. Scrolling down pushes the camera into the current
+ * photo (it grows towards you) while the next one emerges from behind it; scrolling up
+ * reverses the move. The cursor swings the camera slightly in 3D.
+ *
+ * Kept light on purpose: photos are shown at close to their native size (sharp, never blown up),
+ * only the two photos involved in the current transition are rendered, and every change is a
+ * GPU-composited transform/opacity — no layout, no repaint, no blur over the moving image.
  */
-const DEPTH = 900; // px between photo planes
-const PERSPECTIVE = 1000;
+const ZOOM = 0.22; // how far the camera pushes into a photo before it hands over to the next
 
-export function PageDolly({ ids }: { ids: string[] }) {
-  const imgs = ids.map((id) => localImages(id)[0]).filter(Boolean).slice(0, 5);
-  const world = useRef<HTMLDivElement>(null);
+/** `source` lets a page drive the camera itself (e.g. the home page's chapter progress, 0…n-1). */
+export function PageDolly({ ids, source }: { ids: string[]; source?: { progress: number } }) {
+  const imgs = ids.map((id) => localImages(id)[0]).filter(Boolean).slice(0, source ? 12 : 5);
+  const camera = useRef<HTMLDivElement>(null);
   const layers = useRef<(HTMLDivElement | null)[]>([]);
   const { reduced } = useMotion();
   const n = imgs.length;
+  const key = ids.join();
 
   useEffect(() => {
     if (!n) return;
+    const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
     let raf = 0, cur = 0, target = 0, mx = 0, my = 0, cmx = 0, cmy = 0;
     const read = () => {
+      if (source) { target = Math.min(n - 1, Math.max(0, source.progress)); return; }
       const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
-      target = Math.min(1, scrollY / max) * (n - 1);
+      target = Math.min(1, Math.max(0, scrollY / max)) * (n - 1);
     };
     const frame = () => {
       raf = 0;
-      // Eased follow so the dolly glides rather than jumps.
-      cur += (target - cur) * (reduced ? 1 : 0.09);
-      cmx += (mx - cmx) * 0.06; cmy += (my - cmy) * 0.06;
-      if (world.current) world.current.style.transform = `translateZ(${cur * DEPTH}px) rotateY(${cmx * 2.5}deg) rotateX(${-cmy * 1.8}deg)`;
+      if (source) read();
+      cur += (target - cur) * (reduced ? 1 : 0.12);
+      if (Math.abs(target - cur) < 0.0005) cur = target;
+      cmx += (mx - cmx) * 0.08; cmy += (my - cmy) * 0.08;
+      if (camera.current) camera.current.style.transform = `perspective(1200px) rotateY(${(cmx * 3).toFixed(3)}deg) rotateX(${(-cmy * 2).toFixed(3)}deg)`;
+      const i0 = Math.floor(cur), f = cur - i0;
       layers.current.forEach((el, i) => {
         if (!el) return;
-        const d = i - cur; // >0 ahead of the camera, <0 passed
-        // The photo in front stays solid; as the camera passes through it, it dissolves into the next one.
-        const o = d < -0.35 ? 0 : d < 0 ? 1 + d / 0.35 : d < 1 ? 1 : Math.max(0, 1 - (d - 1) * 2);
-        el.style.opacity = o.toFixed(3);
-        el.style.visibility = o < 0.01 ? 'hidden' : 'visible';
+        let o = 0, s = 1;
+        if (i === i0) { o = 1 - Math.max(0, (f - 0.55) / 0.45); s = 1 + f * ZOOM; } // camera pushes in, then it dissolves
+        else if (i === i0 + 1) { o = 1; s = 1 + Math.max(0, f - 0.55) * 0.05; } // waiting right behind
+        const show = o > 0.001;
+        el.style.display = show ? '' : 'none';
+        if (show) { el.style.opacity = o.toFixed(3); el.style.transform = `translate3d(0,0,0) scale(${s.toFixed(4)})`; el.style.zIndex = String(i === i0 ? 2 : 1); }
       });
-      if (!reduced && (Math.abs(target - cur) > 0.0005 || Math.abs(mx - cmx) > 0.001 || Math.abs(my - cmy) > 0.001)) raf = requestAnimationFrame(frame);
+      const settled = cur === target && Math.abs(mx - cmx) < 0.001 && Math.abs(my - cmy) < 0.001;
+      if (!reduced && !settled) raf = requestAnimationFrame(frame);
     };
     const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
     const onScroll = () => { read(); kick(); };
-    const onMove = (e: PointerEvent) => { if (reduced) return; mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; kick(); };
+    const onMove = (e: PointerEvent) => {
+      if (reduced || !fine || e.pointerType !== 'mouse') return;
+      mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; kick();
+    };
     read(); cur = target; frame();
     addEventListener('scroll', onScroll, { passive: true });
     addEventListener('resize', onScroll);
     addEventListener('pointermove', onMove, { passive: true });
-    // Page height changes as lazy content loads.
+    // Page height changes as lazy content loads — re-read, but at most once per frame.
     const ro = new ResizeObserver(onScroll);
     ro.observe(document.body);
     return () => { cancelAnimationFrame(raf); removeEventListener('scroll', onScroll); removeEventListener('resize', onScroll); removeEventListener('pointermove', onMove); ro.disconnect(); };
-  }, [n, reduced, ids.join()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, reduced, key]);
 
   if (!n) return null;
   return (
     <div className="page-dolly" aria-hidden>
-      <div className="pd-camera" style={{ perspective: `${PERSPECTIVE}px` }}>
-        <div ref={world} className="pd-world">
-          {imgs.map((im, i) => (
-            <div key={im.sizes['960'] ?? i} ref={(el) => { layers.current[i] = el; }} className="pd-layer"
-              // Each plane is pre-scaled so it exactly fills the screen when the camera is parked in front of it.
-              style={{ transform: `translateZ(${-i * DEPTH}px) scale(${(PERSPECTIVE + i * DEPTH) / PERSPECTIVE})`, zIndex: n - i }}>
-              <img src={srcOf(im, 'large')} alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} />
-            </div>
-          ))}
-        </div>
+      <div ref={camera} className="pd-camera">
+        {imgs.map((im, i) => (
+          <div key={im.sizes['960'] ?? i} ref={(el) => { layers.current[i] = el; }} className="pd-layer" style={i > 1 ? { display: 'none' } : undefined}>
+            <img src={srcOf(im, 'large')} srcSet={srcSet(im)} sizes="100vw" alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} />
+          </div>
+        ))}
       </div>
       <div className="pd-shade" />
     </div>

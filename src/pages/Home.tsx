@@ -1,21 +1,20 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PageDolly } from '../components/PageDolly';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { COMPANY } from '../config/company';
 import { getDestination } from '../data/catalog';
 import type { Destination } from '../data/types';
 import { DestinationFinder, Portal, usePortal } from '../components/discovery';
 import { MoodCompass, SurpriseMe } from '../components/features';
 import { FxLayer, type Fx } from '../components/FxLayer';
-import { MomentsMarquee, PhotoRing, PhotoStage, usePointerDepth, type StageChapter } from '../components/PhotoStage';
+import { MomentsMarquee, PhotoRing, usePointerDepth, type StageChapter } from '../components/PhotoStage';
 import { audio, type Ambience } from '../lib/audio';
 import { estimateTrip } from '../lib/estimate';
 import { generateItinerary } from '../lib/itinerary';
 import { href, navigate } from '../lib/router';
 import { useMoney, useMotion, useStore } from '../lib/store';
 import { defaultConfig } from '../lib/trip';
-import { localImages, srcOf } from '../lib/localMedia';
-import { webglAvailable } from '../lib/interactions';
+import { localImages } from '../lib/localMedia';
 
-const DollyScene = lazy(() => import('../scene/DollyScene'));
 import { dolly } from '../scene/dollyState';
 import { creditLine, fileLabel } from '../lib/localMedia';
 
@@ -67,9 +66,12 @@ function CursorTrail({ enabled }: { enabled: boolean }) {
       // Colour follows horizontal position and scroll depth.
       pts.push({ x: e.clientX, y: e.clientY, life: 1, hue: ((e.clientX / innerWidth) * 220 + scrollY * 0.05) % 360 });
       if (pts.length > 40) pts.shift();
+      if (!raf) raf = requestAnimationFrame(draw);
     };
     const draw = () => {
+      raf = 0;
       ctx.clearRect(0, 0, c.width, c.height);
+      let alive = false;
       for (const p of pts) {
         p.life -= 0.03;
         if (p.life <= 0) continue;
@@ -77,10 +79,11 @@ function CursorTrail({ enabled }: { enabled: boolean }) {
         ctx.fillStyle = `hsla(${p.hue}, 95%, 65%, ${p.life * 0.45})`;
         ctx.arc(p.x, p.y, 3 + p.life * 7, 0, 6.283);
         ctx.fill();
+        alive = true;
       }
-      raf = requestAnimationFrame(draw);
+      if (alive) raf = requestAnimationFrame(draw);
+      else pts.length = 0;
     };
-    draw();
     addEventListener('pointermove', onMove);
     addEventListener('resize', resize);
     return () => { cancelAnimationFrame(raf); removeEventListener('pointermove', onMove); removeEventListener('resize', resize); };
@@ -100,18 +103,6 @@ function useQuickPrices(ids: string[]) {
 export default function Home() {
   const { paused, reduced, lightweight } = useMotion();
   const motion = !paused && !reduced && !lightweight;
-  const webglOk = useMemo(() => webglAvailable(), []);
-  const webglFailed = useStore((s) => s.webglFailed);
-  const use3D = webglOk && !lightweight && !webglFailed;
-  // Each scene: its 4K photo, plus real photo cards that float past during the dolly.
-  const dollyChapters = useMemo(() => STAGE.map((st, i) => {
-    const img = localImages(st.media)[0];
-    const cards = [...st.depth.map((d) => ({ id: d.media, idx: d.index ?? 0, label: d.label })), ...(STORIES[i]?.portals ?? []).slice(0, 3).map((id) => ({ id, idx: 0, label: getDestination(id)?.name ?? id }))]
-      .map((c) => ({ img: localImages(c.id)[c.idx] ?? localImages(c.id)[0], label: c.label }))
-      .filter((c) => c.img)
-      .map((c) => ({ image: srcOf(c.img!, 'card')!, label: c.label }));
-    return { image: img ? srcOf(img, img.height > img.width ? 'hero' : 'large')! : '', focusY: st.focusY ?? 0.5, cards };
-  }).filter((c) => c.image), []);
   const audioOn = useStore((s) => s.prefs.audioEnabled);
   const money = useMoney();
   const portal = usePortal();
@@ -180,18 +171,9 @@ export default function Home() {
   return (
     <>
       <div className="chapter-progress no-print" ref={bar} style={{ transform: 'scaleX(0)', width: '100%' }} aria-hidden />
-      {use3D ? (
-        <>
-          {/* The photo stage always sits underneath, so the 3D layer never reveals an empty void. */}
-          <PhotoStage chapters={STAGE} active={active} motion={motion} />
-          <Suspense fallback={null}>
-            <DollyScene chapters={dollyChapters} motion={motion} />
-          </Suspense>
-          {stageCredit && <a className="stage-credit" href={stageCredit.source} target="_blank" rel="noreferrer">Background: {fileLabel(stageCredit)} — {creditLine(stageCredit)}</a>}
-        </>
-      ) : (
-        <PhotoStage chapters={STAGE} active={active} motion={motion} />
-      )}
+      {/* Scroll-controlled camera dolly through the chapter photos (sharp, GPU-only, reverses on scroll up). */}
+      <PageDolly ids={STAGE.map((s) => s.media)} source={dolly} />
+      {stageCredit && <a className="stage-credit" href={stageCredit.source} target="_blank" rel="noreferrer">Background: {fileLabel(stageCredit)} — {creditLine(stageCredit)}</a>}
       <FxLayer fx={STAGE[active].fx} enabled={motion} />
       <CursorTrail enabled={motion} />
 

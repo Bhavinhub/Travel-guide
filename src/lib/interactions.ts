@@ -11,25 +11,37 @@ import { audio } from './audio';
 const LIQUID = '.btn, .chip, .segmented button, .tabs button, .card, .spot-card, .top-card, .mode-card, select.input, .pack-head';
 
 /**
- * Cursor-reactive parallax: eased --px / --py (-0.5…0.5) on <html>, read by CSS to shift
- * destination photos and background layers. Fine pointers only; paused for reduced motion.
+ * Cursor-reactive parallax: on-screen destination photos drift a few pixels against the mouse
+ * with eased motion. Only photos currently in view are touched (IntersectionObserver), and only
+ * a composited transform is written — nothing on <html>, so the page never restyles.
+ * Fine pointers only; paused for reduced motion.
  */
+const PX_SEL = '.card .media img, .top-photo img, .spot-card img, .dhero .bg img, .trip-hero img, .gallery img, .ring-card img';
 function installParallax(reduced: () => boolean) {
-  const root = document.documentElement;
+  const visible = new Set<HTMLElement>();
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    const el = e.target as HTMLElement;
+    if (e.isIntersecting) { visible.add(el); el.classList.add('px-img'); } else { visible.delete(el); el.style.translate = ''; }
+  }), { rootMargin: '80px' });
+  const seen = new WeakSet<Element>();
+  const scan = () => document.querySelectorAll<HTMLElement>(PX_SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); io.observe(el); } });
+  let scanT = 0;
+  new MutationObserver(() => { clearTimeout(scanT); scanT = window.setTimeout(scan, 250); }).observe(document.body, { childList: true, subtree: true });
+  scan();
   let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
   const tick = () => {
     raf = 0;
-    if (reduced()) { x = y = 0; } else { x += (tx - x) * 0.07; y += (ty - y) * 0.07; }
-    root.style.setProperty('--px', x.toFixed(4));
-    root.style.setProperty('--py', y.toFixed(4));
-    if (Math.abs(tx - x) > 0.0005 || Math.abs(ty - y) > 0.0005) raf = requestAnimationFrame(tick);
+    if (reduced()) { tx = ty = 0; }
+    x += (tx - x) * 0.08; y += (ty - y) * 0.08;
+    const strong = `${(-x * 22).toFixed(1)}px ${(-y * 16).toFixed(1)}px`, soft = `${(-x * 12).toFixed(1)}px ${(-y * 9).toFixed(1)}px`;
+    visible.forEach((el) => { if (!el.isConnected) { visible.delete(el); return; } el.style.translate = el.closest('.dhero, .trip-hero') ? strong : soft; });
+    if (Math.abs(tx - x) > 0.001 || Math.abs(ty - y) > 0.001) raf = requestAnimationFrame(tick);
   };
   addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
     tx = e.clientX / innerWidth - 0.5; ty = e.clientY / innerHeight - 0.5;
     if (!raf) raf = requestAnimationFrame(tick);
   }, { passive: true });
-  document.addEventListener('pointerleave', () => { tx = ty = 0; if (!raf) raf = requestAnimationFrame(tick); });
 }
 
 export function installInteractions() {

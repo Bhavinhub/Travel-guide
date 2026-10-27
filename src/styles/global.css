@@ -612,14 +612,14 @@ html[data-motion='reduced'] .dhero .bg img { animation: none; }
 /* ═══════════ Liquid glass ═══════════ */
 .glass, .nav, .dock, .chapter-nav { --sheen: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.16) 45%, rgba(255,255,255,.04) 52%, transparent 65%); }
 .glass::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 1;
-  background: var(--sheen) no-repeat; background-size: 250% 100%; background-position: 120% 0; animation: sheen 9s ease-in-out infinite;
+  background: var(--sheen) no-repeat; background-size: 250% 100%; background-position: 120% 0; transition: background-position 1.2s var(--ease);
   box-shadow: inset 0 1px 1px rgba(255,255,255,.35), inset 0 -1px 1px rgba(255,255,255,.08), inset 1px 0 1px rgba(255,255,255,.12); }
 @keyframes sheen { 0%, 55% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
 html[data-motion='reduced'] .glass::after { animation: none; }
 .glass > * { position: relative; z-index: 2; }
 /* Real refraction where supported (Chromium): the backdrop is bent through an SVG displacement map. */
 @supports (backdrop-filter: url(#liquid-glass)) {
-  .liquid, .nav, .dock, .story, .portal-content > div, .journey-head, .trip-hero-text { backdrop-filter: url(#liquid-glass) blur(10px) saturate(170%) brightness(1.05); -webkit-backdrop-filter: blur(10px) saturate(170%); }
+  .liquid, .nav, .dock, .story, .portal-content > div, .journey-head, .trip-hero-text { backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(170%); }
 }
 .trip-hero-text { border-radius: 24px; margin: clamp(.6rem, 2vw, 1.4rem); background: rgba(8, 18, 24, .35); border: 1px solid rgba(255,255,255,.18); }
 .hero-shapes { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
@@ -840,16 +840,14 @@ html[data-theme='light'] .pack-list .qty { color: #1f6b47; }
 @media print { .packing .btn, .pack-progress { display: none; } .pack-list { display: grid !important; } }
 
 /* ═══════════ Scroll-controlled 3D photo dolly behind every page ═══════════ */
-.page-dolly { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--midnight); pointer-events: none; }
+.page-dolly { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--midnight); pointer-events: none; contain: strict; }
 body:has(.page-dolly) .page-bg { display: none; }
-.pd-camera { position: absolute; inset: 0; perspective-origin: 50% 50%; }
-.pd-world { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
-.pd-layer { position: absolute; inset: -6%; backface-visibility: hidden; will-change: transform, opacity; }
+.pd-camera { position: absolute; inset: -3%; transform-origin: 50% 50%; will-change: transform; }
+.pd-layer { position: absolute; inset: 0; will-change: transform, opacity; transform-origin: 50% 55%; backface-visibility: hidden; }
 .pd-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pd-shade { position: absolute; inset: 0;
-  background: radial-gradient(120% 90% at 50% 40%, rgba(5, 12, 20, .22), rgba(5, 12, 20, .62)), linear-gradient(180deg, rgba(5, 12, 20, .45), rgba(5, 12, 20, .2) 40%, rgba(5, 12, 20, .7)); }
-html[data-theme='light'] .pd-shade { background: radial-gradient(120% 90% at 50% 40%, rgba(241, 245, 242, .55), rgba(241, 245, 242, .86)), linear-gradient(180deg, rgba(241, 245, 242, .7), rgba(241, 245, 242, .5) 40%, rgba(241, 245, 242, .9)); }
-/* Text on the page sits over photos now: a soft lift keeps it crisp. */
+  background: linear-gradient(180deg, rgba(5, 12, 20, .5), rgba(5, 12, 20, .12) 32%, rgba(5, 12, 20, .18) 62%, rgba(5, 12, 20, .62)); }
+html[data-theme='light'] .pd-shade { background: linear-gradient(180deg, rgba(241, 245, 242, .7), rgba(241, 245, 242, .38) 35%, rgba(241, 245, 242, .45) 65%, rgba(241, 245, 242, .82)); }
 body:has(.page-dolly) main h1, body:has(.page-dolly) main .lead { text-shadow: 0 2px 22px rgba(0, 0, 0, .45); }
 html[data-theme='light'] body:has(.page-dolly) main h1, html[data-theme='light'] body:has(.page-dolly) main .lead { text-shadow: 0 2px 18px rgba(255, 255, 255, .8); }
 @media print { .page-dolly { display: none !important; } }
@@ -914,19 +912,26 @@ select.input { color: var(--glacier); }
 :is(.card, .spot-card, .top-card, .mode-card):hover::after { opacity: 1; }
 .mode-card[aria-pressed='true'], .mode-card.is-on { border-color: rgba(244,184,96,.8); box-shadow: 0 0 0 2px rgba(244,184,96,.55), 0 14px 30px -16px rgba(244,184,96,.6); }
 
-/* ═══════════ Cursor-reactive parallax (fine pointers only) ═══════════ */
-:is(.card .media img, .top-photo img, .spot-card img, .dhero .bg img, .trip-hero img, .gallery img, .ring-card img) {
-  translate: calc(var(--px) * -14px) calc(var(--py) * -10px); scale: 1.06;
-}
-.dhero .bg img, .trip-hero img { translate: calc(var(--px) * -26px) calc(var(--py) * -18px); scale: 1.08; }
-.pd-camera { translate: calc(var(--px) * -22px) calc(var(--py) * -16px); }
-.page-bg { translate: calc(var(--px) * -18px) calc(var(--py) * -12px); scale: 1.04; }
-@media (hover: none), (pointer: coarse) {
-  :is(.card .media img, .top-photo img, .spot-card img, .dhero .bg img, .trip-hero img, .gallery img, .ring-card img, .pd-camera, .page-bg) { translate: none; scale: none; }
-}
-html[data-motion='reduced'] :is(.card .media img, .top-photo img, .spot-card img, .dhero .bg img, .trip-hero img, .gallery img, .ring-card img, .pd-camera, .page-bg) { translate: none; scale: none; }
+/* ═══════════ Cursor-reactive parallax ═══════════
+   Applied in JS (src/lib/interactions.ts) to on-screen photos only, as a composited transform. */
+.px-img { will-change: transform; }
 @media (prefers-reduced-motion: reduce) {
-  :is(.card .media img, .top-photo img, .spot-card img, .dhero .bg img, .trip-hero img, .gallery img, .ring-card img, .pd-camera, .page-bg) { translate: none; scale: none; }
   :is(.btn, .chip, .segmented button, .tabs button) { transition: none; animation: none !important; }
   :is(.btn:not(.btn-primary), .chip):hover { transform: none; }
 }
+
+.glass:hover::after { background-position: -120% 0; }
+/* Performance: no blur re-rendered over the moving photo background on controls; the
+   expensive SVG refraction filter is reserved for nothing that moves behind. */
+:is(.btn:not(.btn-primary), .chip, select.input, .segmented, .tabs) { backdrop-filter: none; -webkit-backdrop-filter: none; }
+:is(.btn:not(.btn-primary), .chip, select.input) { background: linear-gradient(180deg, rgba(40,58,66,.78), rgba(16,28,34,.82) 55%, rgba(26,40,48,.8)); }
+:is(.segmented, .tabs) { background: rgba(8, 18, 24, .72); }
+html[data-theme='light'] :is(.btn:not(.btn-primary), .chip, select.input) { background: linear-gradient(180deg, #ffffff, #eef3f0 55%, #f6f9f7); }
+html[data-theme='light'] :is(.segmented, .tabs) { background: rgba(255,255,255,.88); }
+body:has(.page-dolly) .glass { backdrop-filter: blur(6px) saturate(130%); -webkit-backdrop-filter: blur(6px) saturate(130%); background: rgba(10, 22, 28, .62); }
+html[data-theme='light'] body:has(.page-dolly) .glass { background: rgba(255, 255, 255, .72); }
+@media (max-width: 760px) { body:has(.page-dolly) .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(10, 22, 28, .8); } html[data-theme='light'] body:has(.page-dolly) .glass { background: rgba(255,255,255,.88); } }
+.px-img { scale: 1.06; }
+.dhero .bg img.px-img, .trip-hero img.px-img { scale: 1.08; }
+@media (hover: none), (pointer: coarse) { .px-img { scale: none; translate: none !important; } }
+html[data-motion='reduced'] .px-img { scale: none; translate: none !important; }

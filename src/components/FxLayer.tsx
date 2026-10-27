@@ -18,7 +18,7 @@ export function FxLayer({ fx, enabled }: { fx: Fx; enabled: boolean }) {
     const c = ref.current!;
     const ctx = c.getContext('2d')!;
     let W = 0, H = 0, raf = 0, mx = 0, my = 0, lastY = scrollY, sv = 0;
-    const dpr = Math.min(devicePixelRatio || 1, 1.5);
+    const dpr = 1;
     const resize = () => { W = innerWidth; H = innerHeight; c.width = W * dpr; c.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     resize();
     const mk = (): P => ({ x: Math.random() * W, y: Math.random() * H, z: 0.3 + Math.random() * 0.9, v: Math.random(), s: Math.random(), h: Math.random() });
@@ -32,7 +32,7 @@ export function FxLayer({ fx, enabled }: { fx: Fx; enabled: boolean }) {
       const v = scrollY - lastY; lastY = scrollY; sv += (v - sv) * 0.15;
       ctx.clearRect(0, 0, W, H);
       ctx.globalAlpha = Math.max(0, alpha);
-      const n = { leaves: 50, rain: 260, pollen: 90, snow: 180, spray: 70, bokeh: 60, stars: 160 }[current];
+      const n = { leaves: 30, rain: 140, pollen: 50, snow: 100, spray: 40, bokeh: 30, stars: 90 }[current];
       for (let i = 0; i < n; i++) {
         const p = ps[i];
         const px = p.x + mx * 60 * p.z;
@@ -70,12 +70,14 @@ export function FxLayer({ fx, enabled }: { fx: Fx; enabled: boolean }) {
         if (p.x < -20) p.x = W + 20;
         if (p.x > W + 20) p.x = -20;
       }
-      raf = requestAnimationFrame(draw);
+      raf = document.hidden ? 0 : requestAnimationFrame(draw);
     };
+    const onVis = () => { if (!document.hidden && !raf) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVis);
     draw();
     addEventListener('pointermove', onMove, { passive: true });
     addEventListener('resize', resize);
-    return () => { cancelAnimationFrame(raf); removeEventListener('pointermove', onMove); removeEventListener('resize', resize); };
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', onVis); removeEventListener('pointermove', onMove); removeEventListener('resize', resize); };
   }, [enabled]);
   if (!enabled) return null;
   return <canvas ref={ref} className="fx-canvas" aria-hidden />;
