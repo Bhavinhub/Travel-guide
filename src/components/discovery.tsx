@@ -1,3 +1,4 @@
+import { localImages, srcOf } from '../lib/localMedia';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { budgetBand, DESTINATIONS, filterDestinations, getDestination, INTEREST_LABELS, KIND_LABEL, MONTHS, searchDestinations } from '../data/catalog';
 import type { Destination, Interest } from '../data/types';
@@ -56,15 +57,16 @@ export function DestinationCard({ d, onOpen }: { d: Destination; onOpen?: (d: De
 
 /** Circular destination portal with a location pin. */
 export function Portal({ d, onOpen }: { d: Destination; onOpen: (d: Destination, e: React.MouseEvent) => void }) {
-  const m = useMedia(d.wiki, 1);
+  const local = localImages(d.id)[0];
+  const m = useMedia(local ? undefined : d.wiki, 1);
   const [broken, setBroken] = useState(false);
   return (
     <button className="portal" onClick={(e) => onOpen(d, e)} style={{ ['--pa' as string]: d.accent }} aria-label={`Open ${d.name} portal`}>
       <span className="portal-ring">
         <span className="disc">
-          {m.lead && !broken ? <img src={m.lead.src} alt="" loading="lazy" onError={() => setBroken(true)} /> : <Illustration scene={d.scene} accent={d.accent} label={false} />}
+          {local && !broken ? <img src={srcOf(local, 'card')} alt="" loading="lazy" onError={() => setBroken(true)} />
+            : m.lead && !broken ? <img src={m.lead.src} alt="" loading="lazy" onError={() => setBroken(true)} /> : <Illustration scene={d.scene} accent={d.accent} label={false} />}
         </span>
-        <span className="pin" aria-hidden>✈</span>
       </span>
       <b>{d.name}</b>
       <small>{d.scope === 'india' ? d.state : d.country}</small>

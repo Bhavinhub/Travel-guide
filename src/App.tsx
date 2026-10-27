@@ -22,6 +22,18 @@ const Contact = lazy(() => import('./pages/Contact'));
 const Info = lazy(() => import('./pages/Info'));
 const Place = lazy(() => import('./pages/Place'));
 
+/** Warm every page's code in the background once the first page has settled, so later clicks open instantly. */
+const PAGE_LOADERS = [() => import('./pages/Explore'), () => import('./pages/Destination'), () => import('./pages/Planner'), () => import('./pages/Trip'),
+  () => import('./pages/Honeymoon'), () => import('./pages/Weekend'), () => import('./pages/Nightlife'), () => import('./pages/Saved'),
+  () => import('./pages/About'), () => import('./pages/Contact'), () => import('./pages/Info'), () => import('./pages/Place')];
+function prefetchPages() {
+  const idle = (cb: () => void) => ('requestIdleCallback' in window ? (window as unknown as { requestIdleCallback: (f: () => void, o?: object) => void }).requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 1200));
+  let i = 0;
+  const next = () => { if (i < PAGE_LOADERS.length) PAGE_LOADERS[i++]().catch(() => undefined).finally(() => idle(next)); };
+  setTimeout(() => idle(next), 1500);
+}
+let prefetched = false;
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) {
@@ -121,6 +133,7 @@ const DOLLY: Record<string, string[]> = {
 };
 
 export default function App() {
+  useEffect(() => { if (!prefetched) { prefetched = true; prefetchPages(); } }, []);
   const route = useDocumentState();
   const [key, sub] = route.parts;
   let page: ReactNode;

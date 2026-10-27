@@ -16,7 +16,7 @@ import { useMotion } from '../lib/store';
 const ZOOM = 0.3;
 const smooth = (t: number) => t * t * (3 - 2 * t);
 
-export interface BackdropPhoto { src: string; srcSet?: string }
+export interface BackdropPhoto { src: string; srcSet?: string; fill?: string }
 /** Pages whose photos come from live sources (e.g. a searched place) publish them here. */
 export const useBackdrop = create<{ photos: BackdropPhoto[] }>(() => ({ photos: [] }));
 export const setBackdrop = (photos: BackdropPhoto[]) => useBackdrop.setState({ photos });
@@ -24,7 +24,7 @@ export const setBackdrop = (photos: BackdropPhoto[]) => useBackdrop.setState({ p
 
 /** `source` lets a page drive the camera itself (e.g. the home page's chapter progress, 0…n-1). */
 export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos?: BackdropPhoto[]; source?: { progress: number } }) {
-  const local = ids.map((id) => localImages(id)[0]).filter(Boolean).map((im) => ({ src: srcOf(im!, 'large')!, srcSet: srcSet(im!), key: im!.sizes['960'] ?? im!.file }));
+  const local = ids.map((id) => localImages(id)[0]).filter(Boolean).map((im) => ({ src: srcOf(im!, 'large')!, srcSet: srcSet(im!), fill: srcOf(im!, 'card'), key: im!.sizes['960'] ?? im!.file }));
   const imgs = (photos?.length ? photos.map((p) => ({ ...p, key: p.src })) : local).filter((x, i, a) => !!source || a.findIndex((y) => y.key === x.key) === i).slice(0, source ? 24 : 8); // keep order intact when a page drives the camera
   const camera = useRef<HTMLDivElement>(null);
   const layers = useRef<(HTMLDivElement | null)[]>([]);
@@ -55,14 +55,12 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
         let o = 0, s = 1, z = 0;
         if (i === i0) { o = 1 - Math.max(0, (f - 0.6) / 0.4); s = 1 + Math.max(0, f - 0.55) * ZOOM; z = f; } // zoom in, then dissolve
         else if (i === i0 + 1) { o = 1; } // the next scene waits behind, whole and fully visible
-        // The whole photo is visible at rest; scrolling zooms the camera in until it fills the screen
-        // (and on into the next scene); scrolling back pulls out until the whole photo shows again.
+        // At rest the photo shows at its widest framing; scrolling zooms the camera in towards the next
+        // scene, and scrolling back pulls out again.
         const img = mains.current[i];
-        if (img && img.naturalWidth) {
-          const a = img.naturalWidth / img.naturalHeight, r = innerWidth / innerHeight;
-          const fill = Math.max(a / r, r / a); // scale at which the whole-photo view fills the screen
+        if (img) {
           const k = smooth(Math.min(1, z / 0.6));
-          img.style.transform = `scale(${(1 + (fill * 1.06 - 1) * k).toFixed(4)})`;
+          img.style.transform = `scale(${(1 + 0.28 * k).toFixed(4)})`; // widest framing at rest → in towards the next scene
         }
         const drift = i === i0 ? f : i === i0 + 1 ? f - 1 : 0; // a gentle cinematic drift between scenes
         const show = o > 0.001;
@@ -98,8 +96,8 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
         {imgs.map((im, i) => (
           <div key={`${i}-${im.key}`} ref={(el) => { layers.current[i] = el; }} className="pd-layer" style={i > 1 ? { display: 'none' } : undefined}>
             <div className="pd-breathe">
-              {/* soft blurred fill of the same photo, so the whole-photo view never shows empty bars */}
-              <img className="pd-fill" src={im.src} alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" />
+              {/* small copy shown instantly (never a dark screen while the 4K photo loads) */}
+              <img className="pd-fill" src={im.fill ?? im.src} alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" />
               <img className="pd-main" src={im.src} srcSet={im.srcSet} sizes="100vw" alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer"
                 onLoad={(e) => { e.currentTarget.classList.add('is-loaded'); window.dispatchEvent(new Event('scroll')); }}
                 ref={(img) => { mains.current[i] = img; if (img?.complete && img.naturalWidth) img.classList.add('is-loaded'); }} />

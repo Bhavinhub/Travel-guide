@@ -1,6 +1,6 @@
 # Travel Guide
 
-**Live site:** https://travel-guide-bhavin.netlify.app
+**Live site:** https://travelguide-india.netlify.app
 
 **Explore beautifully. Plan effortlessly.**
 
@@ -170,6 +170,6 @@ See `CREDITS.md` for media, data and audio credits, and `docs/DATA.md` for the d
 
 ## Deployment (Netlify)
 
-- Project `travel-guide-bhavin`. The build runs `scripts/netlify-build.sh`, which downloads the 4K photos and audio from this public GitHub repo when a deploy uploads code only, then runs `npm run build`.
+- Project `travelguide-india`. The build runs `scripts/netlify-build.sh`, which downloads the 4K photos and audio from this public GitHub repo when a deploy uploads code only, then runs `npm run build`.
 - **Quote requests** are stored by `netlify/functions/quote.mjs` in Netlify Blobs (store `quote-requests`). The endpoint can only create entries. View them in Netlify → Data & Storage → Blobs; decrypt sealed ones offline with `scripts/decrypt-quote.mjs`.
 - **Firebase (optional)**: set the `VITE_FIREBASE_*` variables (see `.env.example`) and deploy `firestore.rules` to store quote requests in Cloud Firestore instead.
