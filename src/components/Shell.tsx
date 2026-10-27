@@ -18,78 +18,123 @@ function NavSearch({ id = 'nav-q' }: { id?: string }) {
   const [open, setOpen] = useState(false);
   const [live, setLive] = useState<{ q: string; hits: PlaceHit[]; loading: boolean }>({ q: '', hits: [], loading: false });
   const [recent, setRecent] = useState<RecentSearch[]>(recentSearches);
+  const [active, setActive] = useState(-1);
+  const pendingEnter = useRef(false);
   const money = useMoney();
   const term = q.trim();
   const curated = term.length >= 2 ? searchDestinations(term).slice(0, 4) : [];
   useEffect(() => {
-    if (term.length < 2) return;
+    setActive(-1);
+    if (term.length < 2) { setLive({ q: '', hits: [], loading: false }); return; }
     const ctl = new AbortController();
     setLive((l) => ({ ...l, loading: true }));
     const t = setTimeout(() => {
       searchAnywhere(term, ctl.signal)
-        .then((hits) => setLive({ q: term, hits: hits.filter((h) => !curated.some((d) => d.name.toLowerCase() === h.name.toLowerCase())), loading: false }))
+        .then((hits) => !ctl.signal.aborted && setLive({ q: term, hits: hits.filter((h) => !curated.some((d) => d.name.toLowerCase() === h.name.toLowerCase())), loading: false }))
         .catch(() => !ctl.signal.aborted && setLive({ q: term, hits: [], loading: false }));
-    }, 280);
+    }, 220);
     return () => { clearTimeout(t); ctl.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [term]);
   const go = (to: string, label: string, sub?: string) => {
     rememberSearch({ label, sub, to });
     setRecent(recentSearches());
-    setQ(''); setOpen(false);
+    setQ(''); setOpen(false); setActive(-1);
+    pendingEnter.current = false;
     (document.activeElement as HTMLElement | null)?.blur();
+    window.dispatchEvent(new Event('tg:search-go')); // closes the phone menu, even for the page already open
     navigate(to);
   };
   const hits = live.q === term ? live.hits : [];
-  const first = curated[0] ? () => go(`/destination/${curated[0].id}`, curated[0].name, curated[0].state ?? curated[0].country)
-    : hits[0] ? () => go(placeHref(hits[0]), hits[0].name, [hits[0].region, hits[0].country].filter(Boolean).join(', ') || hits[0].detail) : null;
   const showRecent = term.length < 2 && recent.length > 0;
   const show = open && (showRecent || term.length >= 2);
+  // Everything in the list, in display order — used by the arrow keys and Enter.
+  const options: { key: string; to: string; label: string; sub?: string }[] = showRecent
+    ? recent.map((r) => ({ key: `r-${r.to}`, to: r.to, label: r.label, sub: r.sub }))
+    : [
+        ...curated.map((d) => ({ key: `d-${d.id}`, to: `/destination/${d.id}`, label: d.name, sub: d.state ?? d.country })),
+        ...hits.map((h, i) => ({ key: `h-${i}-${h.name}`, to: placeHref(h), label: h.name, sub: [h.region, h.country].filter(Boolean).join(', ') || h.detail })),
+      ];
+  const pick = (i: number) => { const o = options[i]; if (o) go(o.to, o.label, o.sub); };
+  // Enter pressed before live results arrived: open the best match as soon as it does.
+  useEffect(() => {
+    if (pendingEnter.current && !live.loading && live.q === term && options.length) pick(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setOpen(true);
+      if (options.length) setActive((i) => (e.key === 'ArrowDown' ? (i + 1) % options.length : (i <= 0 ? options.length - 1 : i - 1)));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (active >= 0 && options[active]) pick(active);
+      else if (options.length && !(term.length >= 2 && live.loading && !curated.length)) pick(0);
+      else if (term.length >= 2) pendingEnter.current = true;
+    } else if (e.key === 'Escape') {
+      setOpen(false); setActive(-1);
+    } else setOpen(true);
+  };
+  useEffect(() => { document.getElementById(`${id}-opt-${active}`)?.scrollIntoView({ block: 'nearest' }); }, [active, id]);
+  // Keeping focus in the box while a suggestion is pressed: Safari does not focus links on click,
+  // so without this the box blurs, the list closes and the click never lands.
+  const keepFocus = (e: React.MouseEvent) => e.preventDefault();
+  const optProps = (i: number, to: string) => ({
+    id: `${id}-opt-${i}`, role: 'option', 'aria-selected': active === i, className: active === i ? 'is-active' : undefined,
+    href: href(to), onMouseDown: keepFocus, onMouseEnter: () => setActive(i),
+    onClick: (e: React.MouseEvent) => { e.preventDefault(); pick(i); },
+  });
+  let n = 0;
   return (
-    <div className="nav-search" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>
+    <div className="nav-search" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setOpen(false); setActive(-1); } }}>
       <label htmlFor={id} className="sr-only">Search any place or person</label>
-      <input id={id} className="input" type="search" placeholder="Search any place, e.g. Almora" value={q} autoComplete="off"
+      <input id={id} className="input" type="search" placeholder="Search any place, e.g. Almora" value={q} autoComplete="off" enterKeyHint="search"
         onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => { setRecent(recentSearches()); setOpen(true); }}
-        onKeyDown={(e) => { if (e.key === 'Enter' && first) first(); if (e.key === 'Escape') setOpen(false); }}
-        aria-expanded={show} aria-controls={`${id}-results`} />
+        onClick={() => setOpen(true)} onKeyDown={onKey}
+        role="combobox" aria-autocomplete="list" aria-expanded={show} aria-controls={`${id}-results`} aria-activedescendant={active >= 0 ? `${id}-opt-${active}` : undefined} />
       {show && (
-        <div id={`${id}-results`} className="nav-results glass panel" role="listbox">
+        <div id={`${id}-results`} className="nav-results glass panel" role="listbox" onMouseDown={keepFocus}>
           {showRecent && (
             <>
               <div className="row between nav-results-head"><span className="tiny muted">Recent searches</span>
                 <button className="tiny linkish" onClick={() => { clearSearches(); setRecent([]); }}>Clear</button></div>
-              {recent.map((r) => (
-                <a key={r.to} href={href(r.to)} role="option" onClick={(e) => { e.preventDefault(); go(r.to, r.label, r.sub); }}>
-                  <span className="ph ico" aria-hidden>↺</span><span><b>{r.label}</b>{r.sub && <><br /><span className="tiny muted">{r.sub}</span></>}</span>
-                </a>
-              ))}
+              {recent.map((r) => {
+                const i = n++;
+                return (
+                  <a key={r.to} {...optProps(i, r.to)}>
+                    <span className="ph ico" aria-hidden>↺</span><span><b>{r.label}</b>{r.sub && <><br /><span className="tiny muted">{r.sub}</span></>}</span>
+                  </a>
+                );
+              })}
             </>
           )}
-          {curated.map((d) => {
+          {!showRecent && curated.map((d) => {
+            const i = n++;
             const img = localImages(d.id)[0];
             const one = quickEstimate(d.id, 1);
             const two = quickEstimate(d.id, 2);
             return (
-              <a key={d.id} href={href(`/destination/${d.id}`)} role="option" onClick={(e) => { e.preventDefault(); go(`/destination/${d.id}`, d.name, d.state ?? d.country); }}>
+              <a key={d.id} {...optProps(i, `/destination/${d.id}`)}>
                 {img ? <img src={srcOf(img, 'card')} alt="" /> : <span className="ph" />}
                 <span><b>{d.name}</b> <span className="tiny muted">{d.scope === 'india' ? d.state : d.country}</span><br />
                   <span className="tiny">Day trip {money(one.total)} · 2 days {money(two.total)}</span></span>
               </a>
             );
           })}
-          {term.length >= 2 && hits.length > 0 && <div className="tiny muted nav-results-head">Places, landmarks & people</div>}
-          {hits.map((h) => {
+          {!showRecent && hits.length > 0 && <div className="tiny muted nav-results-head">Places, landmarks & people</div>}
+          {!showRecent && hits.map((h, hi) => {
+            const i = n++;
             const sub = [h.region, h.country].filter(Boolean).join(', ');
             return (
-              <a key={`${h.kind}-${h.name}-${h.lat ?? ''}`} href={href(placeHref(h))} role="option" onClick={(e) => { e.preventDefault(); go(placeHref(h), h.name, sub || h.detail); }}>
+              <a key={`${hi}-${h.kind}-${h.name}`} {...optProps(i, placeHref(h))}>
                 {h.thumb ? <img src={h.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="ph ico" aria-hidden>{h.kind === 'place' ? '📍' : '📖'}</span>}
                 <span>{h.suggested && <span className="tag pack-must" style={{ marginLeft: 0, marginRight: '.35rem' }}>Did you mean</span>}<b>{h.name}</b>{sub && <span className="tiny muted"> {sub}</span>}<br /><span className="tiny muted">{h.detail ?? (h.kind === 'place' ? 'Place' : 'Wikipedia')}</span></span>
               </a>
             );
           })}
           {term.length >= 2 && live.loading && <p className="tiny muted" style={{ margin: '.4rem .5rem' }}>Searching everywhere…</p>}
-          {term.length >= 2 && !live.loading && !curated.length && !hits.length && <p className="small muted" style={{ margin: '.5rem' }}>No match for “{term}”. Check the spelling or try a nearby town.</p>}
-          {curated.length > 0 && <p className="tiny muted" style={{ margin: '.3rem .5rem' }}>Estimates for 2 adults from the nearest major city, 3-star stay.</p>}
+          {term.length >= 2 && !live.loading && live.q === term && !curated.length && !hits.length && <p className="small muted" style={{ margin: '.5rem' }}>No match for “{term}”. Check the spelling or try a nearby town.</p>}
+          {!showRecent && curated.length > 0 && <p className="tiny muted" style={{ margin: '.3rem .5rem' }}>Estimates for 2 adults from the nearest major city, 3-star stay.</p>}
         </div>
       )}
     </div>
@@ -121,6 +166,11 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    const close = () => setOpen(false);
+    addEventListener('tg:search-go', close);
+    return () => removeEventListener('tg:search-go', close);
+  }, []);
   useEffect(() => {
     if (!open) return;
     closeRef.current?.focus();

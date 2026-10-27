@@ -1033,3 +1033,4 @@ html[data-theme='light'] :is(.dhero, .trip-hero, .chapter, .top-card) .btn:not(.
 .mapfly .mapfly-map { position: absolute; inset: 0; background: transparent; }
 .maplibregl-ctrl-attrib { font-size: 10px; }
 .map-pin, .map-photo, .map-spot, .map-origin { cursor: pointer; }
+.nav-results a.is-active { background: rgba(255,255,255,.1); outline: 1px solid rgba(244,184,96,.5); } html[data-theme='light'] .nav-results a.is-active { background: rgba(13,42,34,.07); }

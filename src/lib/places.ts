@@ -168,8 +168,22 @@ export async function connectedPlaces(title: string, signal?: AbortSignal): Prom
   }
 }
 
-/** Combined live search; tolerant of one source failing. */
+const searchCache = new Map<string, PlaceHit[]>();
+/** Combined live search, cached per query for this visit (repeat searches are instant). */
 export async function searchAnywhere(q: string, signal?: AbortSignal): Promise<PlaceHit[]> {
+  const key = q.trim().toLowerCase();
+  const hit = searchCache.get(key);
+  if (hit) return hit;
+  const res = await searchUncached(q, signal);
+  if (res.length) {
+    searchCache.set(key, res);
+    if (searchCache.size > 60) searchCache.delete(searchCache.keys().next().value!);
+  }
+  return res;
+}
+
+/** Places + Wikipedia together; tolerant of one source failing. */
+async function searchUncached(q: string, signal?: AbortSignal): Promise<PlaceHit[]> {
   const [places, topics] = await Promise.allSettled([geocode(q, signal), wikiSearch(q, signal)]);
   const seen = new Set<string>();
   const p = (places.status === 'fulfilled' ? places.value : []).filter((x) => {
@@ -237,9 +251,11 @@ export async function nearbySpots(lat: number, lon: number, signal?: AbortSignal
 
 export interface RecentSearch { label: string; sub?: string; to: string; at: number }
 const KEY = 'tg.recentSearches';
-export const recentSearches = () => storage.get<RecentSearch[]>(KEY, []);
+const recentKey = (r: Pick<RecentSearch, 'label' | 'sub'>) => `${r.label}|${r.sub ?? ''}`.toLowerCase();
+/** Recent searches, one entry per place (older duplicates are dropped). */
+export const recentSearches = () => storage.get<RecentSearch[]>(KEY, []).filter((r, i, a) => a.findIndex((x) => recentKey(x) === recentKey(r)) === i);
 export function rememberSearch(r: Omit<RecentSearch, 'at'>) {
-  const list = recentSearches().filter((x) => x.to !== r.to);
+  const list = recentSearches().filter((x) => x.to !== r.to && recentKey(x) !== recentKey(r));
   storage.set(KEY, [{ ...r, at: Date.now() }, ...list].slice(0, 8));
 }
 export const clearSearches = () => storage.set(KEY, []);
