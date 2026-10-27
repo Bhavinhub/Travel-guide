@@ -162,7 +162,6 @@ export default function Home() {
         {STORIES.map((s, i) => (
           <div key={s.title}>
             <section id={`chapter-${CHAPTERS[i].id}`} className="chapter" ref={ref(i)} tabIndex={-1} aria-labelledby={`ch-${i}`}>
-              <span className="chapter-label" aria-hidden>{String(i + 1).padStart(2, '0')}</span>
               <div className="chapter-inner">
                 {i === 0 ? (
                   <div className="fade-in hero-3d">

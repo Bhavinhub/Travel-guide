@@ -69,9 +69,10 @@ export function CursorFX() {
       x = e.clientX; y = e.clientY;
       if (!shown) { shown = true; rx = x; ry = y; document.documentElement.classList.add('cursor-fx-on'); }
       if (dot.current) dot.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      // A few specks per move, more when moving fast.
+      // A few specks per move, more when moving fast (none over the 3D map: it needs every frame).
+      const overMap = !!(e.target as Element | null)?.closest?.('.mapfly-sticky');
       const speed = Math.min(30, Math.hypot(e.movementX || 0, e.movementY || 0));
-      const count = 1 + Math.round(speed / 8);
+      const count = overMap ? 0 : 1 + Math.round(speed / 8);
       for (let k = 0; k < count; k++) {
         const ang = Math.random() * Math.PI * 2, sp = 0.2 + Math.random() * 1.1;
         pts.push({ x: x + (Math.random() - 0.5) * 10, y: y + (Math.random() - 0.5) * 10, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 0.2, r: 0.8 + Math.random() * 2.6, hue: 32 + Math.random() * 30, life: 1, decay: 0.018 + Math.random() * 0.03 });

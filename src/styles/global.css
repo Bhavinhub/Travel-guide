@@ -1381,3 +1381,17 @@ html[data-theme='light'] .wordmark .wm-b { filter: drop-shadow(0 1px 0 #a8701e) 
 /* Nothing may widen the page sideways (the 3D photo ring used to push phones to a 500px layout,
    hiding the theme switch). `clip` keeps sticky elements working, unlike `hidden`. */
 main, footer { overflow-x: clip; }
+
+/* ═══ Backgrounds appear only when fully loaded — no half-painted photos, no empty frames ═══ */
+html body .pd-layer .pd-fill { opacity: 0; transition: opacity .5s ease; }
+html body .pd-layer .pd-fill.is-loaded { opacity: 1; }
+.pd-herobg img { position: absolute; inset: 0; opacity: 0; transition: opacity .8s ease; }
+.pd-herobg img.is-loaded { opacity: 1; }
+.pd-card:not(.is-loaded) { visibility: hidden; }
+
+/* Content scrolling under the floating header fades out instead of colliding with the logo
+   (a soft gradient, not a bar or border). */
+body::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: calc(var(--nav-h) + 26px); z-index: 49; pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 9, 16, .92) 0%, rgba(4, 9, 16, .7) 55%, rgba(4, 9, 16, 0) 100%); }
+html[data-theme='light'] body::before { background: linear-gradient(180deg, rgba(241, 245, 242, .95) 0%, rgba(241, 245, 242, .75) 55%, rgba(241, 245, 242, 0) 100%); }
+html.map-full body::before { display: none; }

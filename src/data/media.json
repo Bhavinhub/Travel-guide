@@ -125,6 +125,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AEvening_view%2C_City_Palace%2C_Udaipur.jpg",
     "sizes": {
+     "480": "/media/udaipur/0-480.jpg",
      "960": "/media/udaipur/0-960.jpg",
      "1920": "/media/udaipur/0-1920.jpg"
     }
@@ -861,6 +862,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AEast_facade_Hawa_Mahal_Jaipur_from_ground_level_(July_2022)_-_img_01.jpg",
     "sizes": {
+     "480": "/media/jaipur/0-480.jpg",
      "960": "/media/jaipur/0-960.jpg",
      "1920": "/media/jaipur/0-1920.jpg"
     }
@@ -1242,6 +1244,20 @@
   "article": "Darjeeling Himalayan Railway",
   "images": [
    {
+    "file": "File:Darjeeling with the Himalayas and the Kangchenjunga in the backdrop.jpg",
+    "width": 3088,
+    "height": 2056,
+    "author": "Judith",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Darjeeling_with_the_Himalayas_and_the_Kangchenjunga_in_the_backdrop.jpg",
+    "sizes": {
+     "480": "/media/darjeeling/k-480.jpg",
+     "960": "/media/darjeeling/k-960.jpg",
+     "1920": "/media/darjeeling/k-1920.jpg"
+    }
+   },
+   {
     "file": "File:Steam Train Darjeeling.JPG",
     "width": 3872,
     "height": 2592,
@@ -1311,6 +1327,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADashawamedha_Ghat_in_Varanasi_2.jpg",
     "sizes": {
+     "480": "/media/varanasi/0-480.jpg",
      "960": "/media/varanasi/0-960.jpg",
      "1920": "/media/varanasi/0-1920.jpg",
      "3840": "/media/varanasi/0-3840.jpg"
@@ -2279,6 +2296,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3A%E0%B9%80%E0%B8%88%E0%B8%94%E0%B8%B5%E0%B8%A2%E0%B9%8C%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%98%E0%B8%B2%E0%B8%99%E0%B8%97%E0%B8%A3%E0%B8%87%E0%B8%9B%E0%B8%A3%E0%B8%B2%E0%B8%87%E0%B8%84%E0%B9%8C%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%AD%E0%B8%A3%E0%B8%B8%E0%B8%932.jpg",
     "sizes": {
+     "480": "/media/bangkok/0-480.jpg",
      "960": "/media/bangkok/0-960.jpg",
      "1920": "/media/bangkok/0-1920.jpg",
      "3840": "/media/bangkok/0-3840.jpg"
@@ -2458,6 +2476,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AMarina_Bay_Sands_(I).jpg",
     "sizes": {
+     "480": "/media/singapore/0-480.jpg",
      "960": "/media/singapore/0-960.jpg",
      "1920": "/media/singapore/0-1920.jpg",
      "3840": "/media/singapore/0-3840.jpg"
@@ -2539,6 +2558,7 @@
     "licenseUrl": "https://unsplash.com/license",
     "source": "https://unsplash.com/photos/fU_RObkfzSs",
     "sizes": {
+     "480": "/media/u-taj/0-480.jpg",
      "960": "/media/u-taj/0-960.jpg",
      "1920": "/media/u-taj/0-1920.jpg",
      "3840": "/media/u-taj/0-3840.jpg"
@@ -2638,6 +2658,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3APura_Ulun_Danu_Bratan%2C_2022.jpg",
     "sizes": {
+     "480": "/media/bali/0-480.jpg",
      "960": "/media/bali/0-960.jpg",
      "1920": "/media/bali/0-1920.jpg",
      "3840": "/media/bali/0-3840.jpg"
@@ -2699,6 +2720,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADubai_Skyline_mit_Burj_Khalifa_(cropped).jpg",
     "sizes": {
+     "480": "/media/dubai/0-480.jpg",
      "960": "/media/dubai/0-960.jpg",
      "1920": "/media/dubai/0-1920.jpg",
      "3840": "/media/dubai/0-3840.jpg"
@@ -2759,6 +2781,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AMal%C3%A9.jpg",
     "sizes": {
+     "480": "/media/male/0-480.jpg",
      "960": "/media/male/0-960.jpg",
      "1920": "/media/male/0-1920.jpg",
      "3840": "/media/male/0-3840.jpg"
@@ -3179,6 +3202,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AShibuya_Crossing%2C_Aerial.jpg",
     "sizes": {
+     "480": "/media/tokyo/0-480.jpg",
      "960": "/media/tokyo/0-960.jpg",
      "1920": "/media/tokyo/0-1920.jpg",
      "3840": "/media/tokyo/0-3840.jpg"
@@ -3212,6 +3236,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ATorii_path_with_lantern_at_Fushimi_Inari_Taisha_Shrine%2C_Kyoto%2C_Japan.jpg",
     "sizes": {
+     "480": "/media/kyoto/0-480.jpg",
      "960": "/media/kyoto/0-960.jpg",
      "1920": "/media/kyoto/0-1920.jpg",
      "3840": "/media/kyoto/0-3840.jpg"
@@ -3259,6 +3284,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3A2013_Fireworks_on_Eiffel_Tower_11.jpg",
     "sizes": {
+     "480": "/media/paris/1-480.jpg",
      "960": "/media/paris/1-960.jpg",
      "1920": "/media/paris/1-1920.jpg",
      "3840": "/media/paris/1-3840.jpg"
@@ -3304,6 +3330,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AColosseo_2020.jpg",
     "sizes": {
+     "480": "/media/rome/0-480.jpg",
      "960": "/media/rome/0-960.jpg",
      "1920": "/media/rome/0-1920.jpg",
      "3840": "/media/rome/0-3840.jpg"
@@ -3337,6 +3364,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ATower_Bridge_at_Dawn.jpg",
     "sizes": {
+     "480": "/media/london/0-480.jpg",
      "960": "/media/london/0-960.jpg",
      "1920": "/media/london/0-1920.jpg",
      "3840": "/media/london/0-3840.jpg"
@@ -3355,6 +3383,7 @@
     "license": "Public domain",
     "source": "https://commons.wikimedia.org/wiki/File%3ASwitzerland_(14399363612).jpg",
     "sizes": {
+     "480": "/media/interlaken/0-480.jpg",
      "960": "/media/interlaken/0-960.jpg",
      "1920": "/media/interlaken/0-1920.jpg"
     }
@@ -3411,6 +3440,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
     "source": "https://commons.wikimedia.org/wiki/File%3AKapellbruecke.JPG",
     "sizes": {
+     "480": "/media/lucerne/0-480.jpg",
      "960": "/media/lucerne/0-960.jpg",
      "1920": "/media/lucerne/0-1920.jpg"
     }
@@ -3429,6 +3459,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3APanoramaMatter.jpg",
     "sizes": {
+     "480": "/media/zermatt/0-480.jpg",
      "960": "/media/zermatt/0-960.jpg",
      "1920": "/media/zermatt/0-1920.jpg",
      "3840": "/media/zermatt/0-3840.jpg"
@@ -3611,6 +3642,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AView_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_(cropped).jpg",
     "sizes": {
+     "480": "/media/new-york/0-480.jpg",
      "960": "/media/new-york/0-960.jpg",
      "1920": "/media/new-york/0-1920.jpg",
      "3840": "/media/new-york/0-3840.jpg"

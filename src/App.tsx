@@ -83,7 +83,7 @@ function useDocumentState() {
     const key = route.parts[0] ?? '';
     const sub = key === 'destination' ? getDestination(route.parts[1] ?? '')?.name : key === 'place' ? route.query.get('name') ?? TITLES[key] : TITLES[key];
     document.title = key ? `${sub ?? 'Page not found'} — ${COMPANY.name}` : `${COMPANY.name} — ${COMPANY.tagline}`;
-    if (!route.query.get('section')) window.scrollTo({ top: 0, behavior: 'auto' });
+    if (!route.query.get('section')) window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior }); // instant: the CSS smooth scrolling would visibly roll the new page up
   }, [route.path, route.parts[0] === 'place' ? route.query.toString() : '']); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Live ECB exchange rates replace the reference rates (manual edits still possible in the planner).

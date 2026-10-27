@@ -92,14 +92,24 @@ function travelToDistance(r: Route, t: number) {
 }
 const isWalking = (r: Route, distFrac: number) => r.walkFrom !== undefined && distFrac * r.cum[r.cum.length - 1] >= r.cum[r.walkFrom] - 1e-6;
 
-/** Point and index at fraction t of the route length. */
-function along(r: Route, t: number): { p: [number, number]; i: number } {
+/** Point and index at fraction t of the route length (binary search: routes have thousands of points). */
+function along(r: Route, t: number): { p: [number, number]; i: number; f: number } {
   const total = r.cum[r.cum.length - 1], want = clamp(t) * total;
-  let i = 1;
-  while (i < r.cum.length - 1 && r.cum[i] < want) i++;
-  const seg = r.cum[i] - r.cum[i - 1] || 1, f = clamp((want - r.cum[i - 1]) / seg);
-  return { p: [lerp(r.pts[i - 1][0], r.pts[i][0], f), lerp(r.pts[i - 1][1], r.pts[i][1], f)], i };
+  let lo = 1, hi = r.cum.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (r.cum[mid] < want) lo = mid + 1; else hi = mid; }
+  const i = lo, seg = r.cum[i] - r.cum[i - 1] || 1, f = clamp((want - r.cum[i - 1]) / seg);
+  return { p: [lerp(r.pts[i - 1][0], r.pts[i][0], f), lerp(r.pts[i - 1][1], r.pts[i][1], f)], i, f };
 }
+
+/** Cumulative length in Web-Mercator units — the same measure MapLibre's `line-progress` uses. */
+function mercatorCum(pts: [number, number][]) {
+  const mx = (lon: number) => lon / 360, my = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (clamp(lat / 85, -1, 1) * 85 * Math.PI) / 360)) / (2 * Math.PI);
+  const out = [0];
+  for (let k = 1; k < pts.length; k++) out.push(out[k - 1] + Math.hypot(mx(pts[k][1]) - mx(pts[k - 1][1]), my(pts[k][0]) - my(pts[k - 1][0])));
+  return out;
+}
+/** The gold "travelled" line: the whole route drawn once, revealed up to `t` by a gradient (no re-upload). */
+const doneGradient = (t: number) => ['step', ['line-progress'], t <= 0 ? 'rgba(244,184,96,0)' : '#f4b860', clamp(t, 0.0001, 0.9999), t >= 1 ? '#f4b860' : 'rgba(244,184,96,0)'];
 
 async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSignal): Promise<Route> {
   const a: [number, number] = [from.lat, from.lon];
@@ -203,7 +213,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const ready = useRef(false);
   const mover = useRef<Marker | null>(null);
   const spotMarkers = useRef<Marker[]>([]);
-  const routeRef = useRef<{ r: Route; fit: { center: [number, number]; zoom: number } } | null>(null);
+  const routeRef = useRef<{ r: Route; fit: { center: [number, number]; zoom: number }; mc: number[] } | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
   const [stops, setStops] = useState<RouteStop[]>([]);
   const stopsRef = useRef<RouteStop[]>([]);
@@ -222,6 +232,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const restingRef = useRef(false);
   const nearStop = useRef(false);
   const held = useRef<number | null>(null);
+  const perf = useRef({ last: 0, sum: 0, n: 0, ratio: Math.min(window.devicePixelRatio || 1, 1.25) });
   const restTimer = useRef(0);
   /** Turn 3D terrain on after the camera has rested close to the ground for a moment. */
   const settle = (atGround: boolean) => {
@@ -236,6 +247,19 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     }, 450);
   };
   const doneState = useRef({ n: -1, t: 0 });
+
+  // While the map fills the screen, the page's animated photo backdrop and cursor dust pause, so all
+  // of the device's power goes to the map.
+  useEffect(() => {
+    const st = stickyRef.current;
+    if (!st) return;
+    const io = new IntersectionObserver(([e]) => {
+      document.documentElement.classList.toggle('map-in-view', e.intersectionRatio > 0.55);
+      if (e.intersectionRatio <= 0.55) window.dispatchEvent(new Event('scroll'));
+    }, { threshold: [0, 0.55, 1] });
+    io.observe(st);
+    return () => { io.disconnect(); document.documentElement.classList.remove('map-in-view'); };
+  }, []);
 
   useEffect(() => {
     const s = sec.current;
@@ -272,9 +296,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           labels: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18 },
           street: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors' },
           dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Elevation: AWS Terrain Tiles' },
-          route: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
-          done: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
-          walk: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+          route: { type: 'geojson', lineMetrics: true, data: { type: 'FeatureCollection', features: [] } },
+          walk: { type: 'geojson', lineMetrics: true, data: { type: 'FeatureCollection', features: [] } },
         },
         layers: [
           { id: 'base', type: 'raster', source: 'base' }, // coarse imagery under the sharp layer: no holes while tiles stream in
@@ -285,7 +308,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           { id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 2.5, 'line-opacity': 0.85 } },
           { id: 'walk-glow', type: 'line', source: 'walk', paint: { 'line-color': '#7be0a8', 'line-width': 7, 'line-opacity': 0.3, 'line-blur': 3 } },
           { id: 'walk', type: 'line', source: 'walk', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#b8f5cf', 'line-width': 3, 'line-dasharray': [1.2, 1.6] } },
-          { id: 'done', type: 'line', source: 'done', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f4b860', 'line-width': 5 } },
+          { id: 'done', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-gradient': doneGradient(0) as maplibregl.ExpressionSpecification, 'line-width': 5 } },
+          { id: 'walk-done', type: 'line', source: 'walk', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-gradient': doneGradient(0) as maplibregl.ExpressionSpecification, 'line-width': 4 } },
         ],
         sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 8, 0] },
       },
@@ -394,7 +418,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         // Road trips move slowly enough to keep every request (no half-loaded patches).
         m.cancelPendingTileRequestsWhileZooming = r.mode === 'air';
         prefetchCorridor(r.pts);
-        routeRef.current = { r, fit: { center: c ? [c.lng, c.lat] : [(lon + from.lon) / 2, (lat + from.lat) / 2], zoom: Math.min(zoomTo - 2, cam?.zoom ?? 5) } };
+        routeRef.current = { r, fit: { center: c ? [c.lng, c.lat] : [(lon + from.lon) / 2, (lat + from.lat) / 2], zoom: Math.min(zoomTo - 2, cam?.zoom ?? 5) }, mc: mercatorCum(r.pts) };
         const o = document.createElement('div');
         o.className = 'map-origin';
         o.innerHTML = `<span></span><b>${esc(from.name)}</b>`;
@@ -404,7 +428,9 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         mv.textContent = r.mode === 'air' ? '✈️' : '🚗';
         mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
         markers.push(mover.current);
-        doneState.current = { n: -1, t: 0 };
+        doneState.current = { n: -1, t: -1 };
+        m.setPaintProperty('done', 'line-gradient', doneGradient(0) as maplibregl.ExpressionSpecification);
+        m.setPaintProperty('walk-done', 'line-gradient', doneGradient(0) as maplibregl.ExpressionSpecification);
         setRoute(r);
         kick.current();
         if (autoplay.current) {
@@ -424,7 +450,6 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           d.className = 'map-photo';
           d.innerHTML = `${markerImg(s.image)}<b>${esc(s.title)}</b>`;
           guardImg(d);
-      guardImg(d);
           d.addEventListener('click', () => { cardRef.current = i; setCard(i); });
           markers.push(new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(map.current!));
         });
@@ -447,12 +472,18 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     const m = map.current;
     if (!m || !ready.current) return;
     const rr = routeRef.current;
-    // Re-uploading the travelled line is costly: only when it has grown, and at most ~8 times a second.
-    const setDone = (coords: [number, number][], force = false) => {
-      const now = performance.now();
-      if (!force && (coords.length === doneState.current.n || now - doneState.current.t < 120)) return;
-      doneState.current = { n: coords.length, t: now };
-      (m.getSource('done') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords.map(([a, b]) => [b, a]) } });
+    // The travelled line is revealed by updating a gradient stop — no geometry is re-uploaded per frame.
+    const setDone = (at: { i: number; f: number } | 'start' | 'end') => {
+      if (!rr) return;
+      const mc = rr.mc, last = mc.length - 1, wf = rr.r.walkFrom;
+      const m0 = at === 'start' ? 0 : at === 'end' ? mc[last] : mc[at.i - 1] + (mc[at.i] - mc[at.i - 1]) * at.f;
+      const roadEnd = wf !== undefined ? mc[wf] : mc[last];
+      const road = clamp(m0 / (roadEnd || 1)), walk = wf !== undefined ? clamp((m0 - roadEnd) / ((mc[last] - roadEnd) || 1)) : 0;
+      const prev = doneState.current;
+      if (Math.abs(road - prev.n) < 0.0015 && Math.abs(walk - prev.t) < 0.0015 && at !== 'end' && at !== 'start') return;
+      doneState.current = { n: road, t: walk };
+      m.setPaintProperty('done', 'line-gradient', doneGradient(road) as maplibregl.ExpressionSpecification);
+      if (wf !== undefined) m.setPaintProperty('walk-done', 'line-gradient', doneGradient(walk) as maplibregl.ExpressionSpecification);
     };
     let center: [number, number], zoom: number, pitch: number, bearing = 0;
     if (!rr) {
@@ -466,7 +497,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const e = smooth(p / 0.18);
         center = [lerp(rr.fit.center[0] - 40, rr.fit.center[0], e), lerp(rr.fit.center[1] - 10, rr.fit.center[1], e)];
         zoom = lerp(0.9, rr.fit.zoom, e); pitch = lerp(0, 20, e);
-        setDone([], true); mover.current?.setLngLat([rr.r.pts[0][1], rr.r.pts[0][0]]);
+        setDone('start'); mover.current?.setLngLat([rr.r.pts[0][1], rr.r.pts[0][0]]);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       } else if (p < 0.85) {
         // Follow the road / flight over 3D terrain, looking ahead along the route.
@@ -475,7 +506,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const walking = isWalking(rr.r, f);
         const mv = mover.current?.getElement();
         if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : rr.r.mode === 'air' ? '✈️' : '🚗'; }
-        const { p: pt, i } = along(rr.r, f);
+        const at = along(rr.r, f), pt = at.p;
         const ahead = along(rr.r, Math.min(1, f + 0.04)).p;
         center = [lerp(rr.fit.center[0], pt[1], e), lerp(rr.fit.center[1], pt[0], e)];
         zoom = lerp(rr.fit.zoom, follow, e); pitch = lerp(20, 52, e);
@@ -486,7 +517,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           zoom = lerp(follow, Math.min(zoomTo - 1.5, 14.5), k);
         }
         bearing = e * (Math.atan2(ahead[1] - pt[1], ahead[0] - pt[0]) * 180 / Math.PI) * 0.5;
-        setDone([...rr.r.pts.slice(0, i), pt]); mover.current?.setLngLat([pt[1], pt[0]]);
+        setDone(at); mover.current?.setLngLat([pt[1], pt[0]]);
         const near = stopsRef.current.findIndex((st) => Math.abs(st.frac - f) < 0.065);
         if (near !== cardRef.current) { cardRef.current = near; setCard(near); }
         // Visit tourist spots on the way: as the journey passes one, the camera swings over and dips
@@ -503,15 +534,27 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         // Arrive: dolly in and orbit down onto the place.
         const e = smooth((p - 0.85) / 0.15);
         center = [lon, lat]; zoom = lerp(follow, zoomTo, e); pitch = lerp(52, 50, e); bearing = lerp(0, -20, e);
-        setDone(rr.r.pts, doneState.current.n !== rr.r.pts.length); mover.current?.setLngLat([lon, lat]);
+        setDone('end'); mover.current?.setLngLat([lon, lat]);
         mover.current?.getElement().classList.toggle('is-arrived', e > 0.6);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       }
     }
     m.jumpTo({ center, zoom, pitch, bearing });
+    // Keep the flight fluid on any device: if frames run long, render the map at a lower resolution.
+    const now = performance.now(), gap = now - perf.current.last;
+    perf.current.last = now;
+    if (gap > 4 && gap < 120) {
+      const pf = perf.current;
+      pf.sum += gap; pf.n++;
+      if (pf.n >= 45) {
+        const avg = pf.sum / pf.n;
+        pf.sum = 0; pf.n = 0;
+        if (avg > 23 && pf.ratio > 0.8) { pf.ratio = pf.ratio > 1 ? 1 : 0.8; m.setPixelRatio(pf.ratio); }
+      }
+    }
     // 3D terrain costs a lot of CPU per frame, so it is off while the camera flies (smooth motion)
     // and rises in once the camera rests near the ground (see setTerrainWhenResting).
-    if (terrainOn.current && !restingRef.current) { terrainOn.current = false; m.setTerrain(null); }
+    if (terrainOn.current && (p < 0.9 || (!restingRef.current && p < 0.97))) { terrainOn.current = false; m.setTerrain(null); }
     el.current?.classList.toggle('is-close', zoom > 8.5);
   };
   const camRef = useRef(applyCamera);
@@ -538,7 +581,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       cur = cur < 0 ? target : cur + (target - cur) * (1 - Math.exp(-dt * 3)); // slow, soft glide
       if (Math.abs(target - cur) < 0.0004) cur = target;
       camRef.current(cur);
-      if (cur !== target) { raf = requestAnimationFrame(frame); restingRef.current = false; } else { last = 0; settle(cur > 0.9 || !routeRef.current && cur > 0.8); }
+      if (cur !== target) { raf = requestAnimationFrame(frame); restingRef.current = false; } else { last = 0; settle(cur > 0.97 || !routeRef.current && cur > 0.9); }
     };
     const on = () => { read(); if (!raf) raf = requestAnimationFrame(frame); };
     kick.current = () => { cur = -1; on(); };
