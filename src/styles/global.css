@@ -1285,3 +1285,47 @@ html body .nav .theme-toggle .tt-track { box-shadow: 0 4px 14px rgba(0,0,0,.35);
 /* Only three things up top at every width; links and search live in the ≡ menu. */
 html body header.nav > nav, html body header.nav .nav-tools > .nav-search, html body header.nav .nav-tools > a.btn, html body header.nav .menu-label { display: none !important; }
 html body header.nav { justify-content: space-between; }
+
+/* Map: deep space with the Milky Way behind the globe; names on the globe only once the camera is close. */
+.mapfly .mf-space { position: absolute; inset: -12%; width: 124%; height: 124%; display: block; object-fit: cover; transform: rotate(-14deg) scale(1.55); animation: mfDrift 160s linear infinite alternate; }
+@keyframes mfDrift { to { transform: rotate(-10deg) scale(1.62); } }
+html[data-motion='reduced'] .mapfly .mf-space { animation: none; }
+.mapfly-map:not(.is-close) .map-tour b, .mapfly-map:not(.is-close) .map-photo:not(.map-origin) b { display: none; }
+.mapfly .mf-space-clip { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; }
+
+/* Map full screen (browser full screen, or a window-filling fallback on phones) and offline notices. */
+.mapfly-sticky.is-full, .mapfly-sticky:fullscreen { position: fixed !important; inset: 0 !important; top: 0 !important; width: 100vw !important; height: 100vh !important; height: 100dvh !important; border-radius: 0 !important; z-index: 1000; margin: 0; }
+html.map-full, html.map-full body { overflow: hidden; }
+html.map-full header.nav { display: none !important; }
+.mapfly-sticky.is-full .mapfly-route-form { top: max(1rem, env(safe-area-inset-top)); }
+.mapfly-offline { position: absolute; z-index: 7; left: 50%; bottom: 5.2rem; transform: translateX(-50%); margin: 0; padding: .45rem .9rem; border-radius: 999px; background: rgba(20, 30, 40, .88); color: #ffe2a8; white-space: nowrap; max-width: calc(100% - 2rem); overflow: hidden; text-overflow: ellipsis; }
+.mapfly-offline.is-ok { color: #b8f5cf; cursor: pointer; }
+/* A transformed/filtered ancestor would trap the fixed full-screen map inside it. */
+html.map-full .route-stage, html.map-full main, html.map-full .mapfly { transform: none !important; filter: none !important; animation: none !important; contain: none !important; perspective: none !important; }
+/* The map frame can never be scrolled sideways (a focused control used to shift the whole map left). */
+.mapfly-sticky { overflow: clip; }
+@media (min-width: 641px) { .mapfly .mapfly-ui { max-width: calc(100% - 1.5rem); flex-wrap: wrap; row-gap: .4rem; } }
+@media (max-width: 640px) { .mapfly .mapfly-ui { max-width: none; } }
+.mapfly-ui > * { flex: none; white-space: nowrap; }
+
+/* ═══ Home: the hero photo floats further back, whole, and famous places fly past in 3D ═══ */
+html body .pd-hero .pd-fill { display: none; }
+html body .pd-hero .pd-main { inset: auto; left: 50%; top: 50%; width: auto; height: auto; max-width: 86vw; max-height: 78vh; translate: -50% -50%;
+  object-fit: contain; border-radius: 22px; box-shadow: 0 50px 140px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.14), 0 0 90px rgba(140,190,255,.18); }
+html body .pd-hero .pd-breathe { overflow: visible; }
+.page-dolly:has(.pd-hero) { background: radial-gradient(70% 60% at 50% 45%, #13283f 0%, #08121e 55%, #03070d 100%); }
+html[data-theme='light'] .page-dolly:has(.pd-hero) { background: radial-gradient(70% 60% at 50% 45%, #f4f8fb 0%, #dfe9ef 60%, #c9d8e0 100%); }
+.pd-card { position: absolute; left: 50%; top: 50%; width: clamp(150px, 19vw, 300px); aspect-ratio: 4 / 3; translate: -50% -50%; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 24px 60px -18px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.16); will-change: transform, opacity; backface-visibility: hidden; }
+.pd-card img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 1 !important; animation: none !important; }
+html[data-motion='reduced'] .pd-card { display: none !important; }
+
+/* Explore mode keeps the section's height and the pinned map exactly as in the journey — switching
+   modes never changes the page length, so the page can't jump. */
+.mapfly.is-free:not(.is-static) { height: 300vh; }
+.mapfly.has-route.is-free:not(.is-static) { height: 460vh; }
+.mapfly.is-free:not(.is-static) .mapfly-sticky { position: sticky; top: var(--nav-h); height: calc(100vh - var(--nav-h)); }
+/* Behind the floating hero: the Golden Temple fills the screen (sharp, gently dimmed so the hero and text stand out). */
+.pd-herobg { position: absolute; inset: 0; z-index: 0; will-change: transform; }
+.pd-herobg img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 55%; display: block; filter: brightness(.62) saturate(1.1); }
+html[data-theme='light'] .pd-herobg img { filter: brightness(.85) saturate(1.05); }

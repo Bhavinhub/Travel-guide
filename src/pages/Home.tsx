@@ -29,7 +29,7 @@ const CHAPTERS = [
 
 /** Real photographs per chapter (downloaded from Wikimedia Commons; see CREDITS.md). */
 export const STAGE: (StageChapter & { fx: Fx; ambience: Ambience })[] = [
-  { id: 'forest', media: 'kedarnath-day', focusY: 0.42, fallbackWiki: 'Kedarnath Temple', accent: '#f4dca0', fx: 'pollen', ambience: 'forest', depth: [{ media: 'badrinath-day', label: 'Badrinath Temple' }, { media: 'u-kedarnath', label: 'Kedarnath at dusk' }] },
+  { id: 'forest', media: 'kedarnath-day', focusY: 0.42, fallbackWiki: 'Kedarnath Temple', accent: '#f4dca0', fx: 'pollen', ambience: 'forest', depth: [{ media: 'badrinath-day', label: 'Badrinath Temple' }, { media: 'u-taj', label: 'Taj Mahal' }] },
   { id: 'rainforest', media: 'u-kerala', fallbackWiki: 'Athirappilly Falls', accent: '#5fbf86', fx: 'pollen', ambience: 'rain', depth: [{ media: 'm-elephant', label: 'Asian elephants' }, { media: 'm-backwaters', label: 'Kerala backwaters' }] },
   { id: 'valley', media: 'u-pangong', fallbackWiki: 'Kullu Valley', accent: '#a9d6ff', fx: 'pollen', ambience: 'wind', depth: [{ media: 'm-tahr', label: 'Nilgiri tahr' }, { media: 'manali', label: 'Manali' }] },
   { id: 'snow', media: 'ch-snow', fallbackWiki: 'Gurudongmar Lake', accent: '#dbeeff', fx: 'snow', ambience: 'wind', depth: [{ media: 'leh', label: 'Leh' }, { media: 'srinagar', index: 1, label: 'Kashmir' }] },
@@ -49,11 +49,15 @@ const STORIES: { eyebrow: string; title: string; body: string; portals: string[]
 
 /** Five photos per chapter — its scene, two related moments and two of its featured destinations — so the
  *  camera glides continuously through far more imagery while the story beats stay the same. */
-const PER_CHAPTER = 5;
+const PER_CHAPTER = 6;
+/** Famous places from around the world that float past in 3D on the home page. */
+const WORLD_FIELD = ['paris', 'tokyo', 'new-york', 'dubai', 'rome', 'interlaken', 'kyoto', 'london', 'singapore', 'zermatt', 'bali', 'u-taj', 'lucerne', 'male', 'bangkok', 'udaipur', 'jaipur', 'varanasi'];
 const HOME_BACKDROP = (() => {
   const used = new Set<string>();
   // Spare photos (unused destinations) fill any chapter that has fewer of its own — never a repeat in a row.
-  const spare = ['kedarnath', 'nainital', 'rishikesh', 'mussoorie', 'darjeeling', 'udaipur', 'jaipur', 'varanasi', 'hampi', 'gangtok', 'shimla', 'ooty'].filter((id) => localImages(id).length);
+  // One Kedarnath photo only (the hero) — no repeats of the same temple further on.
+  used.add('kedarnath'); used.add('u-kedarnath');
+  const spare = ['paris', 'kyoto', 'rome', 'london', 'new-york', 'dubai', 'tokyo', 'zermatt', 'nainital', 'rishikesh', 'mussoorie', 'darjeeling', 'udaipur', 'jaipur', 'varanasi', 'hampi', 'gangtok', 'shimla', 'ooty'].filter((id) => localImages(id).length);
   const take = (id?: string) => (id && !used.has(id) && localImages(id).length ? (used.add(id), id) : undefined);
   return STAGE.flatMap((s, i) => {
     used.add(s.media);
@@ -150,7 +154,7 @@ export default function Home() {
       <div className="chapter-progress no-print" ref={bar} style={{ transform: 'scaleX(0)', width: '100%' }} aria-hidden />
       {/* Scroll-controlled camera dolly through the chapter photos (sharp, GPU-only, reverses on scroll up). */}
       {/* Five photos per chapter, gliding continuously with the scroll. */}
-      <PageDolly ids={HOME_BACKDROP} source={homeDolly} />
+      <PageDolly ids={HOME_BACKDROP} source={homeDolly} field={WORLD_FIELD} hero heroBackdrop="golden-temple" />
       <FxLayer fx={STAGE[active].fx} enabled={motion} />
 
 

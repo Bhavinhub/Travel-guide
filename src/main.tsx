@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { installInteractions } from './lib/interactions';
+import { registerOffline } from './lib/offlineMap';
 import { installReveal } from './lib/reveal';
 import './styles/global.css';
 
@@ -14,6 +15,7 @@ try {
 }
 
 installInteractions();
+registerOffline();
 requestAnimationFrame(() => installReveal());
 // The journey has a clear beginning: reloads start at the top rather than mid-scroll.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';

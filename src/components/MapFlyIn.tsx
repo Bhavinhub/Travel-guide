@@ -5,6 +5,7 @@ import { DESTINATIONS, searchDestinations } from '../data/catalog';
 import { localImages, srcOf } from '../lib/localMedia';
 import { geocode, nearbySpots, placeHref, SACRED_OR_SCENIC, SCENIC_STOP, type NearbySpot } from '../lib/places';
 import { href, navigate } from '../lib/router';
+import { saveTripOffline } from '../lib/offlineMap';
 import { useMotion } from '../lib/store';
 
 /**
@@ -198,6 +199,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const terrainOn = useRef(false);
   const restingRef = useRef(false);
   const nearStop = useRef(false);
+  const held = useRef<number | null>(null);
   const restTimer = useRef(0);
   /** Turn 3D terrain on after the camera has rested close to the ground for a moment. */
   const settle = (atGround: boolean) => {
@@ -233,12 +235,17 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       maxPitch: 80,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 1.25),
       fadeDuration: 0,
+      // The flight changes zoom every frame: never cancel tile requests mid-zoom (that left dark,
+      // unloaded patches), and keep more tiles cached so earlier views stay sharp behind the camera.
+      cancelPendingTileRequestsWhileZooming: false,
+      maxTileCacheZoomLevels: 8,
       attributionControl: { compact: true },
       interactive: true,
       style: {
         version: 8,
         projection: { type: 'globe' },
         sources: {
+          base: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 7 },
           satellite: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
           labels: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18 },
           street: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors' },
@@ -248,6 +255,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           walk: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         },
         layers: [
+          { id: 'base', type: 'raster', source: 'base' }, // coarse imagery under the sharp layer: no holes while tiles stream in
           { id: 'satellite', type: 'raster', source: 'satellite' },
           { id: 'street', type: 'raster', source: 'street', layout: { visibility: 'none' } },
           { id: 'labels', type: 'raster', source: 'labels' },
@@ -285,9 +293,21 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     });
     const fallback = window.setTimeout(() => setLoaded(true), 6000);
     // Keep the canvas matched to its frame (sticky layouts change size as the page settles).
-    const ro = new ResizeObserver(() => m.resize());
+    // Resizing with 3D terrain on leaves MapLibre's terrain textures at the old size (a blank map), so
+    // terrain steps out for the resize and comes back once the map has redrawn.
+    let lastSize = '';
+    const ro = new ResizeObserver(() => {
+      const size = `${el.current?.clientWidth}x${el.current?.clientHeight}`;
+      if (size === lastSize) return;
+      lastSize = size;
+      const had = terrainOn.current;
+      if (had) { terrainOn.current = false; m.setTerrain(null); }
+      m.resize();
+      if (had) m.once('idle', () => { if (restingRef.current && !terrainOn.current && map.current === m) { terrainOn.current = true; m.setTerrain({ source: 'dem', exaggeration: 1.3 }); } });
+    });
     ro.observe(el.current!);
     map.current = m;
+    if (import.meta.env.DEV) (window as unknown as { __map: maplibregl.Map }).__map = m;
     return () => { clearTimeout(fallback); ro.disconnect(); ready.current = false; terrainOn.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [near, lat, lon, name]);
@@ -471,7 +491,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     };
     const frame = (now: number) => {
       raf = 0;
-      if (freeRef.current || playRef.current) { cur = -1; return; }
+      if (freeRef.current || playRef.current || fullRef.current) { cur = -1; return; }
+      // After "Play journey" the camera stays at the destination until the visitor clearly scrolls,
+      // then glides from there (never snaps back to the globe).
+      if (held.current !== null) { if (Math.abs(target - held.current) < 0.06) return; held.current = null; cur = 1; }
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
       last = now;
       cur = cur < 0 ? target : cur + (target - cur) * (1 - Math.exp(-dt * 3)); // slow, soft glide
@@ -508,13 +531,13 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       p = clamp(p + (dt * 1000 / dur) * (nearStop.current ? 0.22 : 1)); // linger at tourist spots on the way
       camRef.current(p);
       if (p < 1) requestAnimationFrame(step);
-      else { playRef.current = false; setPlaying(false); settle(true); }
+      else { playRef.current = false; setPlaying(false); settle(true); const r = sec.current?.getBoundingClientRect(); held.current = r ? clamp(-r.top / Math.max(1, r.height - innerHeight)) : 0; }
     };
     requestAnimationFrame(step);
   };
   const playFn = useRef(play);
   playFn.current = play;
-  const stop = () => { playRef.current = false; setPlaying(false); kick.current(); };
+  const stop = () => { held.current = null; playRef.current = false; setPlaying(false); kick.current(); };
 
   const toggleFree = () => {
     const m = map.current;
@@ -525,6 +548,57 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     if (next) { m.easeTo({ center: [lon, lat], zoom: Math.max(m.getZoom(), zoomTo - 1), pitch: 60, duration: 1600 }); settle(true); }
     else kick.current();
   };
+  // ── Full screen: the browser's own full screen where it exists, otherwise the map fills the window. ──
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const fullRef = useRef(false);
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const on = () => { if (!document.fullscreenElement) setFull(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false); };
+    document.addEventListener('fullscreenchange', on); addEventListener('keydown', esc);
+    return () => { document.removeEventListener('fullscreenchange', on); removeEventListener('keydown', esc); };
+  }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle('map-full', full);
+    // There is no page to scroll in full screen: drag, pinch and zoom work there; on exit the map goes
+    // back to exactly how it was (scroll journey or explore), and the page stays where it was.
+    fullRef.current = full;
+    if (full) setInteractive(true);
+    else if (!freeRef.current) { setInteractive(false); kick.current(); }
+    // (the map's ResizeObserver redraws it at the new size)
+    return () => document.documentElement.classList.remove('map-full');
+  }, [full]); // eslint-disable-line react-hooks/exhaustive-deps
+  const savedY = useRef(0);
+  useEffect(() => { if (!full && savedY.current) { const y = savedY.current; requestAnimationFrame(() => scrollTo(0, y)); } }, [full]);
+  const toggleFull = () => {
+    const s = stickyRef.current;
+    if (!full) {
+      savedY.current = scrollY;
+      setFull(true);
+      s?.requestFullscreen?.().catch(() => undefined); // iPhone Safari has no element full screen: the CSS fallback covers it
+    } else {
+      setFull(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+    }
+  };
+
+  // ── Offline: works with or without a connection; "Save offline" stores this journey's map tiles. ──
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [savedMsg, setSavedMsg] = useState('');
+  useEffect(() => {
+    const up = () => setOnline(true), down = () => setOnline(false);
+    addEventListener('online', up); addEventListener('offline', down);
+    return () => { removeEventListener('online', up); removeEventListener('offline', down); };
+  }, []);
+  const saveOffline = async () => {
+    if (saving !== null) return;
+    setSaving(0); setSavedMsg('');
+    const n = await saveTripOffline(routeRef.current?.r.pts ?? [], [lat, lon], setSaving, mode === 'street');
+    setSaving(null);
+    setSavedMsg(n ? `Saved ${n.toLocaleString('en-IN')} map tiles — this journey now works offline.` : 'Could not save right now — try again when online.');
+  };
+
   const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
 
   const routeLabel = route && from
@@ -534,8 +608,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   return (
     <>
     <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}`} aria-label={`3D map journey to ${name}`}>
-      <div className="mapfly-sticky">
-        <div className="mapfly-stage"><div ref={el} className={`mapfly-map${loaded ? ' is-ready' : ''}`} /></div>
+      <div ref={stickyRef} className={`mapfly-sticky${full ? ' is-full' : ''}`}>
+        <div className="mapfly-stage"><SpaceSky /><div ref={el} className={`mapfly-map${loaded ? ' is-ready' : ''}`} /></div>
         {!loaded && (
           <div className="mapfly-loading" aria-live="polite">
             <span className="mf-earth" aria-hidden />
@@ -562,8 +636,12 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           </div>
           <button className="btn btn-sm btn-primary" onClick={playing ? stop : play}>{playing ? '■ Stop' : '▶ Play journey'}</button>
           <button className="btn btn-sm" onClick={toggleFree}>{free ? 'Back to journey' : 'Explore map'}</button>
+          <button className="btn btn-sm" onClick={toggleFull} aria-pressed={full}>{full ? '✕ Exit full screen' : '⛶ Full screen'}</button>
+          <button className="btn btn-sm" onClick={saveOffline} disabled={saving !== null || !online} title="Download this journey's map so it works without internet">{saving !== null ? `Saving… ${Math.round(saving * 100)}%` : '⬇ Save offline'}</button>
           <a className="btn btn-sm" href={from ? `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${lat},${lon}` : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`} target="_blank" rel="noreferrer">Directions ↗</a>
         </div>
+        {!online && <p className="mapfly-offline small" role="status">Offline — showing the map saved on this device</p>}
+        {savedMsg && <p className="mapfly-offline small is-ok" role="status" onClick={() => setSavedMsg('')}>{savedMsg}</p>}
         {(free || reduced) && (
           <div className="mapfly-zoom glass" role="group" aria-label="Zoom">
             <button onClick={() => zoomBy(1)} aria-label="Zoom in">+</button>
@@ -592,4 +670,9 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     )}
     </>
   );
+}
+
+/** Deep space behind the globe: a real photograph of the Milky Way (ESO/S. Brunier, CC BY 4.0). */
+function SpaceSky() {
+  return <div className="mf-space-clip" aria-hidden><img className="mf-space" src={`${import.meta.env.BASE_URL}media/space/milky-way.jpg`} alt="" decoding="async" /></div>;
 }

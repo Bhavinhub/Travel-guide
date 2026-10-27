@@ -3695,5 +3695,43 @@
     }
    }
   ]
+ },
+ "space-milky-way": {
+  "article": "Milky Way",
+  "caption": "The Milky Way, all-sky panorama",
+  "images": [
+   {
+    "file": "File:ESO - Milky Way.jpg",
+    "width": 6000,
+    "height": 3000,
+    "author": "ESO/S. Brunier",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:ESO_-_Milky_Way.jpg",
+    "sizes": {
+     "1920": "/media/space/milky-way.jpg"
+    }
+   }
+  ]
+ },
+ "golden-temple": {
+  "article": "Golden Temple",
+  "caption": "Harmandir Sahib, the Golden Temple, Amritsar",
+  "images": [
+   {
+    "file": "File:Golden Temple, Amritsar 01.jpg",
+    "width": 5011,
+    "height": 3341,
+    "author": "Bernard Gagnon",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Golden_Temple,_Amritsar_01.jpg",
+    "sizes": {
+     "960": "/media/golden-temple/0-960.jpg",
+     "1920": "/media/golden-temple/0-1920.jpg",
+     "3840": "/media/golden-temple/0-3840.jpg"
+    }
+   }
+  ]
  }
 }
