@@ -1,4 +1,4 @@
-import { CursorFX } from './components/CursorFX';
+import { LiquidHover } from './components/LiquidHover';
 import { PageDolly, useBackdrop } from './components/PageDolly';
 import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { COMPANY } from './config/company';
@@ -183,7 +183,7 @@ export default function App() {
       <a className="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); document.getElementById('main')?.scrollIntoView(); }}>Skip to content</a>
       <PageDolly ids={key && key !== 'place' ? dollyIds : []} photos={key === 'place' ? placePhotos : undefined} />
       <Nav />
-      <CursorFX />
+      <LiquidHover />
       <ErrorBoundary key={routeKey}>
         <Suspense fallback={<main className="page" id="main"><div className="page-bg" /><div className="loader"><div className="spinner" /><p className="small">Loading…</p></div></main>}>
           <div className={key ? 'route-stage' : undefined} key={routeKey}>{page}</div>

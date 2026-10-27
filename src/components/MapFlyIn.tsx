@@ -683,6 +683,14 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
 
   // ── Offline: works with or without a connection; "Save offline" stores this journey's map tiles. ──
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: Event) => { if (!(e.target as Element)?.closest?.('.mapfly-ui')) setMenuOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    addEventListener('pointerdown', close); addEventListener('keydown', esc);
+    return () => { removeEventListener('pointerdown', close); removeEventListener('keydown', esc); };
+  }, [menuOpen]);
   const [saving, setSaving] = useState<number | null>(null);
   const [savedMsg, setSavedMsg] = useState('');
   useEffect(() => {
@@ -750,16 +758,24 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
               <button type="button" className="btn btn-sm mf-visit" tabIndex={card === i ? 0 : -1} onClick={() => navigate(placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon }))}>Open guide →</button></div>
           </div>
         ))}
-        <div className="mapfly-ui glass">
-          <div className="seg" role="group" aria-label="Map type">
-            <button aria-pressed={mode === 'satellite'} onClick={() => setMode('satellite')}>Satellite</button>
-            <button aria-pressed={mode === 'street'} onClick={() => setMode('street')}>Map</button>
-          </div>
-          <button className="btn btn-sm btn-primary" onClick={playing ? stop : play}>{playing ? '■ Stop' : '▶ Play journey'}</button>
-          <button className="btn btn-sm" onClick={toggleFree}>{free ? 'Back to journey' : 'Explore map'}</button>
-          <button className="btn btn-sm" onClick={toggleFull} aria-pressed={full}>{full ? '✕ Exit full screen' : '⛶ Full screen'}</button>
-          <button className="btn btn-sm" onClick={saveOffline} disabled={saving !== null || !online} title="Download this journey's map so it works without internet">{saving !== null ? `Saving… ${Math.round(saving * 100)}%` : '↓ Save offline'}</button>
-          <a className="btn btn-sm" href={from ? `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${lat},${lon}` : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`} target="_blank" rel="noreferrer">Directions ↗</a>
+        {/* Every map action in one place: a single "Map options" button opening a small menu. */}
+        <div className="mapfly-ui">
+          <button type="button" className="btn btn-sm mf-options-btn" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+            {playing ? '■ Playing' : '☰ Map options'}
+          </button>
+          {menuOpen && (
+            <div className="mf-options" role="menu" aria-label="Map options">
+              <button role="menuitem" className="mf-opt is-primary" onClick={() => { setMenuOpen(false); (playing ? stop : play)(); }}>{playing ? '■ Stop journey' : '▶ Play journey'}</button>
+              <div className="mf-opt-row" role="group" aria-label="Map type">
+                <button role="menuitemradio" aria-checked={mode === 'satellite'} className={`mf-opt-half${mode === 'satellite' ? ' is-on' : ''}`} onClick={() => setMode('satellite')}>Satellite</button>
+                <button role="menuitemradio" aria-checked={mode === 'street'} className={`mf-opt-half${mode === 'street' ? ' is-on' : ''}`} onClick={() => setMode('street')}>Map</button>
+              </div>
+              <button role="menuitem" className="mf-opt" onClick={() => { setMenuOpen(false); toggleFree(); }}>{free ? '↺ Back to journey' : '✋ Explore map'}</button>
+              <button role="menuitem" className="mf-opt" onClick={() => { setMenuOpen(false); toggleFull(); }}>{full ? '✕ Exit full screen' : '⛶ Full screen'}</button>
+              <button role="menuitem" className="mf-opt" onClick={saveOffline} disabled={saving !== null || !online}>{saving !== null ? `Saving… ${Math.round(saving * 100)}%` : '↓ Save offline'}</button>
+              <a role="menuitem" className="mf-opt" onClick={() => setMenuOpen(false)} href={from ? `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${lat},${lon}` : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`} target="_blank" rel="noreferrer">↗ Directions in Google Maps</a>
+            </div>
+          )}
         </div>
         {locMsg && <p className="mapfly-offline small" role="status" onClick={() => setLocMsg('')}>{locMsg}</p>}
         {!online && <p className="mapfly-offline small" role="status">Offline — showing the map saved on this device</p>}
