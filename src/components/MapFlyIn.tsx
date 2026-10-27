@@ -1,7 +1,9 @@
 import maplibregl, { type Map as MLMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
-import { nearbySpots, placeHref, SCENIC_STOP, type NearbySpot } from '../lib/places';
+import { DESTINATIONS, searchDestinations } from '../data/catalog';
+import { localImages, srcOf } from '../lib/localMedia';
+import { geocode, nearbySpots, placeHref, SACRED_OR_SCENIC, SCENIC_STOP, type NearbySpot } from '../lib/places';
 import { href, navigate } from '../lib/router';
 import { useMotion } from '../lib/store';
 
@@ -43,13 +45,29 @@ function arc(a: [number, number], b: [number, number], n = 96): [number, number]
   });
 }
 
-interface Route { pts: [number, number][]; cum: number[]; mode: 'road' | 'air'; km: number; hours?: number }
+interface Route {
+  pts: [number, number][]; cum: number[]; mode: 'road' | 'air'; km: number; hours?: number;
+  /** Where the road ends and a footpath continues (index into pts), e.g. the Kedarnath trek. */
+  walkFrom?: number; walkKm?: number; walkHours?: number;
+}
 
 function buildRoute(pts: [number, number][], mode: Route['mode'], km?: number, hours?: number): Route {
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + kmBetween(pts[i - 1], pts[i]));
   return { pts, cum, mode, km: km ?? cum[cum.length - 1], hours };
 }
+
+/**
+ * Travel progress → distance progress. With a walking leg the journey gives the footpath a larger
+ * share of the time than its length, so the walker visibly moves slower than the car did.
+ */
+function travelToDistance(r: Route, t: number) {
+  if (r.walkFrom === undefined) return clamp(t);
+  const total = r.cum[r.cum.length - 1], driveFrac = r.cum[r.walkFrom] / total;
+  const tDrive = 0.7; // first 70% of the travel time drives the road; the last 30% walks the path
+  return t <= tDrive ? (t / tDrive) * driveFrac : driveFrac + ((t - tDrive) / (1 - tDrive)) * (1 - driveFrac);
+}
+const isWalking = (r: Route, distFrac: number) => r.walkFrom !== undefined && distFrac * r.cum[r.cum.length - 1] >= r.cum[r.walkFrom] - 1e-6;
 
 /** Point and index at fraction t of the route length. */
 function along(r: Route, t: number): { p: [number, number]; i: number } {
@@ -73,6 +91,17 @@ async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSi
         const all: [number, number][] = g.geometry.coordinates.map(([lo, la]: [number, number]) => [la, lo]);
         const step = Math.max(1, Math.ceil(all.length / 700)); // keep winding mountain roads, cap the point count
         const pts = all.filter((_, i) => i % step === 0 || i === all.length - 1);
+        // The road stops short of the place (a trek, a pilgrim path, a pedestrian old town)? Walk the rest.
+        const end = pts[pts.length - 1], gap = kmBetween(end, to);
+        if (gap > 0.6 && gap < 40) {
+          try {
+            const w = await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${end[1]},${end[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`, { signal }).then((x) => x.json());
+            const wr = w.routes?.[0];
+            const walk: [number, number][] = wr?.geometry?.coordinates?.length > 1 ? wr.geometry.coordinates.map(([lo, la]: [number, number]) => [la, lo]) : [end, to];
+            const route = buildRoute([...pts, ...walk.slice(1)], 'road', g.distance / 1000 + (wr ? wr.distance / 1000 : gap), g.duration / 3600);
+            return { ...route, walkFrom: pts.length - 1, walkKm: wr ? wr.distance / 1000 : gap, walkHours: wr ? wr.duration / 3600 : gap / 4 };
+          } catch { /* no footpath data: draw the road only */ }
+        }
         return buildRoute(pts, 'road', g.distance / 1000, g.duration / 3600);
       }
     } catch { /* fall back to a straight arc */ }
@@ -101,7 +130,50 @@ async function scenicStops(r: Route, from: MapOrigin, to: [number, number], sign
   return out.sort((a, b) => a.frac - b.frac);
 }
 
-export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { lat: number; lon: number; name: string; spots?: MapSpot[]; zoomTo?: number; from?: MapOrigin }) {
+/** Place picker for the map's From / To boxes: curated destinations first, then any place on Earth. */
+function PlaceInput({ label, value, onPick }: { label: string; value: string; onPick: (p: MapOrigin) => void }) {
+  const [q, setQ] = useState(value);
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState<(MapOrigin & { sub?: string })[]>([]);
+  useEffect(() => setQ(value), [value]);
+  useEffect(() => {
+    const term = q.trim();
+    if (!open || term.length < 2 || term === value) { setList([]); return; }
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      const curated = searchDestinations(term).slice(0, 3).map((d) => ({ name: d.name, lat: d.lat, lon: d.lon, sub: d.state ?? d.country }));
+      setList(curated);
+      geocode(term, ctl.signal).then((g) => !ctl.signal.aborted && setList([...curated, ...g.filter((x) => !curated.some((c) => c.name === x.name)).slice(0, 5).map((x) => ({ name: x.name, lat: x.lat!, lon: x.lon!, sub: [x.region, x.country].filter(Boolean).join(', ') }))])).catch(() => undefined);
+    }, 180);
+    return () => { clearTimeout(t); ctl.abort(); };
+  }, [q, open, value]);
+  const items = list;
+  const pick = (p: MapOrigin & { sub?: string }) => { setQ(p.name); setOpen(false); onPick({ name: p.name, lat: p.lat, lon: p.lon }); };
+  return (
+    <label className="mf-field" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>
+      <span className="tiny muted">{label}</span>
+      <input className="input" value={q} placeholder="Any city or place" onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={(e) => { e.currentTarget.select(); setOpen(true); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && items[0]) { e.preventDefault(); pick(items[0]); } if (e.key === 'Escape') setOpen(false); }} />
+      {open && items.length > 0 && (
+        <span className="mf-list" role="listbox" onMouseDown={(e) => e.preventDefault()}>
+          {items.map((p, i) => <button type="button" key={`${p.name}-${i}`} role="option" aria-selected={false} onClick={() => pick(p)}><b>{p.name}</b>{p.sub && <span className="tiny muted"> {p.sub}</span>}</button>)}
+        </span>
+      )}
+    </label>
+  );
+}
+
+export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from: pFrom }: { lat: number; lon: number; name: string; spots?: MapSpot[]; zoomTo?: number; from?: MapOrigin }) {
+  // Visitors can pick their own From / To; otherwise the page's place and nearest city are used.
+  const [custom, setCustom] = useState<{ from?: MapOrigin; to?: MapOrigin }>({});
+  useEffect(() => setCustom({}), [pLat, pLon]);
+  const lat = custom.to?.lat ?? pLat, lon = custom.to?.lon ?? pLon, name = custom.to?.name ?? pName;
+  const from = custom.from ?? pFrom;
+  const autoplay = useRef(false);
+  // Only build the 3D Earth when the visitor gets close to it (keeps pages fast), then fade it in once drawn.
+  const [near, setNear] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [tour, setTour] = useState<NearbySpot[]>([]);
   const sec = useRef<HTMLElement>(null);
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
@@ -123,15 +195,44 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
   const { reduced } = useMotion();
   const fromKey = from ? `${from.name}|${from.lat},${from.lon}` : '';
   const kick = useRef<() => void>(() => undefined);
+  const terrainOn = useRef(false);
+  const restingRef = useRef(false);
+  const nearStop = useRef(false);
+  const restTimer = useRef(0);
+  /** Turn 3D terrain on after the camera has rested close to the ground for a moment. */
+  const settle = (atGround: boolean) => {
+    clearTimeout(restTimer.current);
+    restingRef.current = false;
+    if (!atGround) return;
+    restTimer.current = window.setTimeout(() => {
+      const m = map.current;
+      if (!m || !ready.current) return;
+      restingRef.current = true;
+      if (!terrainOn.current) { terrainOn.current = true; m.setTerrain({ source: 'dem', exaggeration: 1.3 }); }
+    }, 450);
+  };
+  const doneState = useRef({ n: -1, t: 0 });
+
+  useEffect(() => {
+    const s = sec.current;
+    if (!s) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: '900px 0px' });
+    io.observe(s);
+    return () => io.disconnect();
+  }, []);
 
   // ── Create the globe ──
   useEffect(() => {
+    if (!near) return;
+    setLoaded(false);
     const m = new maplibregl.Map({
       container: el.current!,
       center: [lon, lat],
       zoom: reduced ? zoomTo : 0.9,
       pitch: 0,
       maxPitch: 80,
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 1.25),
+      fadeDuration: 0,
       attributionControl: { compact: true },
       interactive: true,
       style: {
@@ -141,9 +242,10 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
           satellite: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
           labels: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18 },
           street: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors' },
-          dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Elevation: AWS Terrain Tiles' },
+          dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Elevation: AWS Terrain Tiles' },
           route: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           done: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+          walk: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         },
         layers: [
           { id: 'satellite', type: 'raster', source: 'satellite' },
@@ -151,9 +253,10 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
           { id: 'labels', type: 'raster', source: 'labels' },
           { id: 'route-glow', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.25, 'line-blur': 4 } },
           { id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 2.5, 'line-opacity': 0.85 } },
+          { id: 'walk-glow', type: 'line', source: 'walk', paint: { 'line-color': '#7be0a8', 'line-width': 7, 'line-opacity': 0.3, 'line-blur': 3 } },
+          { id: 'walk', type: 'line', source: 'walk', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#b8f5cf', 'line-width': 3, 'line-dasharray': [1.2, 1.6] } },
           { id: 'done', type: 'line', source: 'done', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f4b860', 'line-width': 5 } },
         ],
-        terrain: { source: 'dem', exaggeration: 1.4 },
         sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 8, 0] },
       },
     });
@@ -165,11 +268,29 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
     pin.title = `Play the journey to ${name}`;
     pin.addEventListener('click', () => playFn.current());
     new maplibregl.Marker({ element: pin }).setLngLat([lon, lat]).addTo(m);
-    m.on('load', () => { ready.current = true; kick.current(); });
+    // All Travel Guide destinations as round photo markers — click one to open its guide.
+    DESTINATIONS.forEach((d) => {
+      const im = localImages(d.id)[0];
+      if (!im || (Math.abs(d.lat - lat) < 0.05 && Math.abs(d.lon - lon) < 0.05)) return;
+      const e = document.createElement('div');
+      e.className = 'map-dest';
+      e.title = `${d.name} — open guide`;
+      e.innerHTML = `<img src="${srcOf(im, 'card')}" alt=""><b>${esc(d.name)}</b>`;
+      e.addEventListener('click', () => navigate(`/destination/${d.id}`));
+      new maplibregl.Marker({ element: e }).setLngLat([d.lon, d.lat]).addTo(m);
+    });
+    m.on('load', () => {
+      ready.current = true; kick.current();
+      m.once('idle', () => setLoaded(true)); // first full frame drawn: reveal (no black flash)
+    });
+    const fallback = window.setTimeout(() => setLoaded(true), 6000);
+    // Keep the canvas matched to its frame (sticky layouts change size as the page settles).
+    const ro = new ResizeObserver(() => m.resize());
+    ro.observe(el.current!);
     map.current = m;
-    return () => { ready.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
+    return () => { clearTimeout(fallback); ro.disconnect(); ready.current = false; terrainOn.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, name]);
+  }, [near, lat, lon, name]);
 
   // Satellite / street map.
   useEffect(() => {
@@ -183,20 +304,27 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
     if (m.isStyleLoaded()) apply(); else m.once('load', apply);
   }, [mode]);
 
-  // Nearby places as small markers.
+  // Best tourist places around the destination, shown on the map with their photos.
+  useEffect(() => {
+    const ctl = new AbortController();
+    setTour([]);
+    nearbySpots(lat, lon, ctl.signal).then((x) => !ctl.signal.aborted && setTour(x.filter((p) => p.dist > 0.4 && p.title.toLowerCase() !== name.toLowerCase() && p.image && (SACRED_OR_SCENIC.test(`${p.title} ${p.description ?? ''}`) || SCENIC_STOP.test(`${p.title} ${p.description ?? ''}`))).slice(0, 10)));
+    return () => ctl.abort();
+  }, [lat, lon]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     spotMarkers.current.forEach((k) => k.remove());
-    spotMarkers.current = spots.slice(0, 12).map((s) => {
+    spotMarkers.current = tour.map((s) => {
       const d = document.createElement('div');
-      d.className = 'map-spot';
-      d.title = s.name;
-      d.innerHTML = '<span></span>';
-      if (s.href) d.addEventListener('click', () => window.open(s.href, '_blank', 'noopener'));
+      d.className = 'map-photo map-tour';
+      d.title = `${s.title} — open guide`;
+      d.innerHTML = `<img src="${esc(s.image ?? '')}" alt="" referrerpolicy="no-referrer"><b>${esc(s.title)}</b>`;
+      const to = placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon });
+      d.addEventListener('click', () => navigate(to));
       return new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(m);
     });
-  }, [spots, lat, lon]);
+  }, [tour, near, lat, lon]);
 
   // ── Route from the starting city, and scenic stops along it ──
   useEffect(() => {
@@ -207,7 +335,11 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
       const m = map.current;
       if (ctl.signal.aborted || !m) return;
       const draw = () => {
-        (m.getSource('route') as maplibregl.GeoJSONSource).setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: r.pts.map(([a, b]) => [b, a]) } });
+        const roadPts = r.walkFrom !== undefined ? r.pts.slice(0, r.walkFrom + 1) : r.pts;
+        (m.getSource('route') as maplibregl.GeoJSONSource).setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: roadPts.map(([a, b]) => [b, a]) } });
+        (m.getSource('walk') as maplibregl.GeoJSONSource).setData(r.walkFrom !== undefined
+          ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: r.pts.slice(r.walkFrom).map(([a, b]) => [b, a]) } }
+          : { type: 'FeatureCollection', features: [] });
         if (r.mode === 'air') m.setPaintProperty('route', 'line-dasharray', [2, 2]);
         const lngs = r.pts.map((p) => p[1]), lats = r.pts.map((p) => p[0]);
         const cam = m.cameraForBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 70 });
@@ -222,10 +354,12 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
         mv.textContent = r.mode === 'air' ? '✈' : '🚗';
         mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
         markers.push(mover.current);
+        doneState.current = { n: -1, t: 0 };
         setRoute(r);
         kick.current();
+        if (autoplay.current) { autoplay.current = false; setTimeout(() => playFn.current(), 300); }
       };
-      if (m.isStyleLoaded()) draw(); else m.once('load', draw);
+      if (ready.current) draw(); else m.once('load', draw);
       scenicStops(r, from, [lat, lon], ctl.signal).then((st) => {
         if (ctl.signal.aborted || !map.current) return;
         stopsRef.current = st; setStops(st);
@@ -245,20 +379,27 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
       setRoute(null); stopsRef.current = []; setStops([]); cardRef.current = -1; setCard(-1);
       const m = map.current;
       if (m?.getSource('route')) (m.getSource('route') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+      if (m?.getSource('walk')) (m.getSource('walk') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromKey, lat, lon]);
+  }, [fromKey, lat, lon, near]);
 
   /** The 3D camera for journey progress p (0 = whole Earth, 1 = landed at the place). */
   const applyCamera = (p: number) => {
     const m = map.current;
     if (!m || !ready.current) return;
     const rr = routeRef.current;
-    const setDone = (coords: [number, number][]) => (m.getSource('done') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords.map(([a, b]) => [b, a]) } });
+    // Re-uploading the travelled line is costly: only when it has grown, and at most ~8 times a second.
+    const setDone = (coords: [number, number][], force = false) => {
+      const now = performance.now();
+      if (!force && (coords.length === doneState.current.n || now - doneState.current.t < 120)) return;
+      doneState.current = { n: coords.length, t: now };
+      (m.getSource('done') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords.map(([a, b]) => [b, a]) } });
+    };
     let center: [number, number], zoom: number, pitch: number, bearing = 0;
     if (!rr) {
       const e = smooth(p);
-      center = [lon, lat]; zoom = lerp(0.9, zoomTo, e); pitch = lerp(0, 62, smooth(clamp((p - 0.45) / 0.55)));
+      center = [lon, lat]; zoom = lerp(0.9, zoomTo, e); pitch = lerp(0, 55, smooth(clamp((p - 0.45) / 0.55)));
       bearing = lerp(0, -25, e);
     } else {
       const follow = Math.max(rr.fit.zoom, Math.min(rr.fit.zoom + 1.6, 11, zoomTo - 1));
@@ -267,28 +408,53 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
         const e = smooth(p / 0.18);
         center = [lerp(rr.fit.center[0] - 40, rr.fit.center[0], e), lerp(rr.fit.center[1] - 10, rr.fit.center[1], e)];
         zoom = lerp(0.9, rr.fit.zoom, e); pitch = lerp(0, 20, e);
-        setDone([]); mover.current?.setLngLat([rr.r.pts[0][1], rr.r.pts[0][0]]);
+        setDone([], true); mover.current?.setLngLat([rr.r.pts[0][1], rr.r.pts[0][0]]);
+        if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       } else if (p < 0.85) {
         // Follow the road / flight over 3D terrain, looking ahead along the route.
         const t = (p - 0.18) / 0.67, e = smooth(clamp(t * 5));
-        const f = smooth(t);
+        const f = travelToDistance(rr.r, smooth(t)); // the walking stretch takes longer than its length
+        const walking = isWalking(rr.r, f);
+        const mv = mover.current?.getElement();
+        if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : rr.r.mode === 'air' ? '✈' : '🚗'; }
         const { p: pt, i } = along(rr.r, f);
         const ahead = along(rr.r, Math.min(1, f + 0.04)).p;
         center = [lerp(rr.fit.center[0], pt[1], e), lerp(rr.fit.center[1], pt[0], e)];
-        zoom = lerp(rr.fit.zoom, follow, e); pitch = lerp(20, 58, e);
+        zoom = lerp(rr.fit.zoom, follow, e); pitch = lerp(20, 52, e);
+        if (walking && rr.r.walkFrom !== undefined) {
+          // On foot the camera comes down close, so the walker's pace and the path are visible.
+          const total = rr.r.cum[rr.r.cum.length - 1], w0 = rr.r.cum[rr.r.walkFrom] / total;
+          const k = smooth(clamp((f - w0) / Math.max(0.0001, (1 - w0) * 0.25)));
+          zoom = lerp(follow, Math.min(zoomTo - 1.5, 14.5), k);
+        }
         bearing = e * (Math.atan2(ahead[1] - pt[1], ahead[0] - pt[0]) * 180 / Math.PI) * 0.5;
         setDone([...rr.r.pts.slice(0, i), pt]); mover.current?.setLngLat([pt[1], pt[0]]);
         const near = stopsRef.current.findIndex((st) => Math.abs(st.frac - f) < 0.065);
         if (near !== cardRef.current) { cardRef.current = near; setCard(near); }
+        // Visit tourist spots on the way: as the journey passes one, the camera swings over and dips
+        // down to look at it, then rejoins the route.
+        const visit = stopsRef.current.reduce((best, st) => { const k = 1 - Math.abs(st.frac - f) / 0.045; return k > best.k ? { k, st } : best; }, { k: 0, st: null as RouteStop | null });
+        if (visit.st && visit.k > 0) {
+          const k = smooth(clamp(visit.k));
+          center = [lerp(center[0], visit.st.lon, k * 0.9), lerp(center[1], visit.st.lat, k * 0.9)];
+          zoom = lerp(zoom, Math.max(zoom, Math.min(zoomTo - 1.5, 14)), k * 0.85);
+          pitch = lerp(pitch, 58, k);
+        }
+        nearStop.current = visit.k > 0.25;
       } else {
         // Arrive: dolly in and orbit down onto the place.
         const e = smooth((p - 0.85) / 0.15);
-        center = [lon, lat]; zoom = lerp(follow, zoomTo, e); pitch = lerp(58, 68, e); bearing = lerp(0, -30, e);
-        setDone(rr.r.pts); mover.current?.setLngLat([lon, lat]);
+        center = [lon, lat]; zoom = lerp(follow, zoomTo, e); pitch = lerp(52, 50, e); bearing = lerp(0, -20, e);
+        setDone(rr.r.pts, doneState.current.n !== rr.r.pts.length); mover.current?.setLngLat([lon, lat]);
+        mover.current?.getElement().classList.toggle('is-arrived', e > 0.6);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       }
     }
     m.jumpTo({ center, zoom, pitch, bearing });
+    // 3D terrain costs a lot of CPU per frame, so it is off while the camera flies (smooth motion)
+    // and rises in once the camera rests near the ground (see setTerrainWhenResting).
+    if (terrainOn.current && !restingRef.current) { terrainOn.current = false; m.setTerrain(null); }
+    el.current?.classList.toggle('is-close', zoom > 8.5);
   };
   const camRef = useRef(applyCamera);
   camRef.current = applyCamera;
@@ -308,10 +474,10 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
       if (freeRef.current || playRef.current) { cur = -1; return; }
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
       last = now;
-      cur = cur < 0 ? target : cur + (target - cur) * (1 - Math.exp(-dt * 5));
+      cur = cur < 0 ? target : cur + (target - cur) * (1 - Math.exp(-dt * 3)); // slow, soft glide
       if (Math.abs(target - cur) < 0.0004) cur = target;
       camRef.current(cur);
-      if (cur !== target) raf = requestAnimationFrame(frame); else last = 0;
+      if (cur !== target) { raf = requestAnimationFrame(frame); restingRef.current = false; } else { last = 0; settle(cur > 0.9 || !routeRef.current && cur > 0.8); }
     };
     const on = () => { read(); if (!raf) raf = requestAnimationFrame(frame); };
     kick.current = () => { cur = -1; on(); };
@@ -333,13 +499,16 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
     if (playRef.current || !map.current) return;
     if (free) { setFree(false); setInteractive(false); }
     setPlaying(true); playRef.current = true;
-    const dur = routeRef.current ? 14000 : 6000, t0 = performance.now();
+    const dur = routeRef.current ? 20000 : 8000;
+    let p = 0, last = performance.now();
     const step = (now: number) => {
       if (!playRef.current) return;
-      const p = clamp((now - t0) / dur);
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      p = clamp(p + (dt * 1000 / dur) * (nearStop.current ? 0.22 : 1)); // linger at tourist spots on the way
       camRef.current(p);
       if (p < 1) requestAnimationFrame(step);
-      else { playRef.current = false; setPlaying(false); }
+      else { playRef.current = false; setPlaying(false); settle(true); }
     };
     requestAnimationFrame(step);
   };
@@ -353,25 +522,37 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
     const next = !free;
     setFree(next);
     setInteractive(next);
-    if (next) m.easeTo({ center: [lon, lat], zoom: Math.max(m.getZoom(), zoomTo - 1), pitch: 60, duration: 1600 });
+    if (next) { m.easeTo({ center: [lon, lat], zoom: Math.max(m.getZoom(), zoomTo - 1), pitch: 60, duration: 1600 }); settle(true); }
     else kick.current();
   };
   const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
 
   const routeLabel = route && from
-    ? `${route.mode === 'air' ? '✈ By air' : '🚗 By road'} from ${from.name} · ${Math.round(route.km).toLocaleString('en-IN')} km${route.hours ? ` · about ${Math.floor(route.hours)} h ${Math.round((route.hours % 1) * 60)} min` : ''}`
+    ? `${route.mode === 'air' ? '✈ By air' : '🚗 By road'} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · about ${Math.floor(route.hours)} h ${Math.round((route.hours % 1) * 60)} min` : ''}${route.walkKm ? ` + 🚶 ${route.walkKm.toFixed(1)} km on foot (about ${Math.floor(route.walkHours ?? 0)} h ${Math.round(((route.walkHours ?? 0) % 1) * 60)} min)` : ''}`
     : null;
 
   return (
     <>
     <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}`} aria-label={`3D map journey to ${name}`}>
       <div className="mapfly-sticky">
-        <div className="mapfly-stage"><div ref={el} className="mapfly-map" /></div>
+        <div className="mapfly-stage"><div ref={el} className={`mapfly-map${loaded ? ' is-ready' : ''}`} /></div>
+        {!loaded && (
+          <div className="mapfly-loading" aria-live="polite">
+            <span className="mf-earth" aria-hidden />
+            <span className="small">{near ? 'Loading the 3D Earth…' : '3D Earth journey'}</span>
+          </div>
+        )}
+        <form className="mapfly-route-form glass" onSubmit={(e) => e.preventDefault()} aria-label="Plan a route on the map">
+          <PlaceInput label="From" value={from?.name ?? ''} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, from: p })); }} />
+          <PlaceInput label="To" value={name} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, to: p })); }} />
+          {(custom.from || custom.to) && <button type="button" className="btn btn-sm" onClick={() => setCustom({})} title="Back to this page's place" aria-label="Reset route">↺</button>}
+        </form>
         {routeLabel && <p className="mapfly-route small">{routeLabel}</p>}
         {stops.map((s, i) => (
           <div key={s.title} className={`mapfly-card glass${card === i ? ' is-on' : ''}`} aria-hidden={card !== i}>
             {s.image && <img src={s.image} alt={s.title} referrerPolicy="no-referrer" />}
-            <div><span className="tiny muted">On the way · {s.kmFromStart} km from {from?.name}</span><b>{s.title}</b>{s.description && <span className="tiny muted">{s.description}</span>}</div>
+            <div><span className="tiny muted">On the way · {s.kmFromStart} km from {from?.name}</span><b>{s.title}</b>{s.description && <span className="tiny muted">{s.description}</span>}
+              <button type="button" className="btn btn-sm mf-visit" tabIndex={card === i ? 0 : -1} onClick={() => navigate(placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon }))}>Open guide →</button></div>
           </div>
         ))}
         <div className="mapfly-ui glass">

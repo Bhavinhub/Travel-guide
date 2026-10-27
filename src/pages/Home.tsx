@@ -39,6 +39,10 @@ export const STAGE: (StageChapter & { fx: Fx; ambience: Ambience })[] = [
   { id: 'discover', media: 'u-taj', fallbackWiki: 'Taj Mahal', accent: '#c9b6ff', fx: 'stars', ambience: 'wind', depth: [{ media: 'm-holi', label: 'Holi' }, { media: 'm-aarti', label: 'Ganga aarti' }] },
 ];
 
+const HOME_BACKDROP = STAGE.flatMap((s, i) => (i < STAGE.length - 1 ? [s.media, s.depth[0]?.media ?? s.media, s.depth[1]?.media ?? s.media] : [s.media]));
+/** Chapter progress (0…6) → backdrop progress across both photos of each chapter. */
+const homeDolly = { get progress() { return dolly.progress * 3; } }; // chapter i's own photo sits at 3i
+
 const STORIES: { eyebrow: string; title: string; body: string; portals: string[]; side?: 'right' }[] = [
   { eyebrow: 'Chapter 1 · Forest & hills', title: 'Discover your next extraordinary journey.', body: 'Explore India and the world through immersive destinations, personalised itineraries, and clear travel estimates.', portals: [] },
   { eyebrow: 'Chapter 2 · Kerala backwaters', title: 'Where the monsoon paints everything green.', body: 'Coffee estates in the clouds, backwaters lined with palms and waterfalls that roar after the rains. The Western Ghats are among the most biodiverse places on Earth.', portals: ['coorg', 'munnar', 'alleppey', 'wayanad', 'bali', 'chiang-mai'], side: 'right' },
@@ -132,7 +136,8 @@ export default function Home() {
     <>
       <div className="chapter-progress no-print" ref={bar} style={{ transform: 'scaleX(0)', width: '100%' }} aria-hidden />
       {/* Scroll-controlled camera dolly through the chapter photos (sharp, GPU-only, reverses on scroll up). */}
-      <PageDolly ids={STAGE.map((s) => s.media)} source={dolly} />
+      {/* Three photos per chapter (its scene, then two related moments) — far more imagery, same story beats. */}
+      <PageDolly ids={HOME_BACKDROP} source={homeDolly} />
       {stageCredit && <a className="stage-credit" href={stageCredit.source} target="_blank" rel="noreferrer">Background: {fileLabel(stageCredit)} — {creditLine(stageCredit)}</a>}
       <FxLayer fx={STAGE[active].fx} enabled={motion} />
 

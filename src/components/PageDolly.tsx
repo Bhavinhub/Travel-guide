@@ -13,7 +13,8 @@ import { useMotion } from '../lib/store';
  * only the two photos involved in the current transition are rendered, and every change is a
  * GPU-composited transform/opacity — no layout, no repaint, no blur over the moving image.
  */
-const ZOOM = 0.22;
+const ZOOM = 0.3;
+const smooth = (t: number) => t * t * (3 - 2 * t);
 
 export interface BackdropPhoto { src: string; srcSet?: string }
 /** Pages whose photos come from live sources (e.g. a searched place) publish them here. */
@@ -24,9 +25,10 @@ export const setBackdrop = (photos: BackdropPhoto[]) => useBackdrop.setState({ p
 /** `source` lets a page drive the camera itself (e.g. the home page's chapter progress, 0…n-1). */
 export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos?: BackdropPhoto[]; source?: { progress: number } }) {
   const local = ids.map((id) => localImages(id)[0]).filter(Boolean).map((im) => ({ src: srcOf(im!, 'large')!, srcSet: srcSet(im!), key: im!.sizes['960'] ?? im!.file }));
-  const imgs = (photos?.length ? photos.map((p) => ({ ...p, key: p.src })) : local).filter((x, i, a) => a.findIndex((y) => y.key === x.key) === i).slice(0, source ? 12 : 5);
+  const imgs = (photos?.length ? photos.map((p) => ({ ...p, key: p.src })) : local).filter((x, i, a) => !!source || a.findIndex((y) => y.key === x.key) === i).slice(0, source ? 24 : 8); // keep order intact when a page drives the camera
   const camera = useRef<HTMLDivElement>(null);
   const layers = useRef<(HTMLDivElement | null)[]>([]);
+  const mains = useRef<(HTMLImageElement | null)[]>([]);
   const { reduced } = useMotion();
   const n = imgs.length;
   const key = imgs.map((i) => i.key).join();
@@ -50,18 +52,30 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
       const i0 = Math.floor(cur), f = cur - i0;
       layers.current.forEach((el, i) => {
         if (!el) return;
-        let o = 0, s = 1;
-        if (i === i0) { o = 1 - Math.max(0, (f - 0.55) / 0.45); s = 1 + f * ZOOM; } // camera pushes in, then it dissolves
-        else if (i === i0 + 1) { o = 1; s = 1 + Math.max(0, f - 0.55) * 0.05; } // waiting right behind
+        let o = 0, s = 1, z = 0;
+        if (i === i0) { o = 1 - Math.max(0, (f - 0.6) / 0.4); s = 1 + Math.max(0, f - 0.55) * ZOOM; z = f; } // zoom in, then dissolve
+        else if (i === i0 + 1) { o = 1; } // the next scene waits behind, whole and fully visible
+        // The whole photo is visible at rest; scrolling zooms the camera in until it fills the screen
+        // (and on into the next scene); scrolling back pulls out until the whole photo shows again.
+        const img = mains.current[i];
+        if (img && img.naturalWidth) {
+          const a = img.naturalWidth / img.naturalHeight, r = innerWidth / innerHeight;
+          const fill = Math.max(a / r, r / a); // scale at which the whole-photo view fills the screen
+          const k = smooth(Math.min(1, z / 0.6));
+          img.style.transform = `scale(${(1 + (fill * 1.06 - 1) * k).toFixed(4)})`;
+        }
+        const drift = i === i0 ? f : i === i0 + 1 ? f - 1 : 0; // a gentle cinematic drift between scenes
         const show = o > 0.001;
         el.style.display = show ? '' : 'none';
-        if (show) { el.style.opacity = o.toFixed(3); el.style.transform = `translate3d(0,0,0) scale(${s.toFixed(4)})`; el.style.zIndex = String(i === i0 ? 2 : 1); }
+        if (show) { el.style.opacity = o.toFixed(3); el.style.transform = `translate3d(${(drift * -18).toFixed(1)}px, ${(drift * -10).toFixed(1)}px, 0) rotate(${(drift * 0.6).toFixed(3)}deg) scale(${s.toFixed(4)})`; el.style.zIndex = String(i === i0 ? 2 : 1); }
       });
-      const settled = cur === target && Math.abs(mx - cmx) < 0.001 && Math.abs(my - cmy) < 0.001;
+      const settled = cur === target && (!source || Math.abs(source.progress - cur) < 0.0005) && Math.abs(mx - cmx) < 0.001 && Math.abs(my - cmy) < 0.001;
       if (!reduced && !settled) raf = requestAnimationFrame(frame);
     };
     const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
-    const onScroll = () => { read(); kick(); };
+    // With an external source (the home page's chapters), that page updates its progress in its own
+    // frame after the scroll — look again one frame later so the camera never stops on stale progress.
+    const onScroll = () => { read(); kick(); if (source) requestAnimationFrame(() => requestAnimationFrame(() => { read(); kick(); })); };
     const onMove = (e: PointerEvent) => {
       if (reduced || !fine || e.pointerType !== 'mouse') return;
       mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; kick();
@@ -82,8 +96,14 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
     <div className="page-dolly" aria-hidden>
       <div ref={camera} className="pd-camera">
         {imgs.map((im, i) => (
-          <div key={im.key} ref={(el) => { layers.current[i] = el; }} className="pd-layer" style={i > 1 ? { display: 'none' } : undefined}>
-            <img src={im.src} srcSet={im.srcSet} sizes="100vw" alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" />
+          <div key={`${i}-${im.key}`} ref={(el) => { layers.current[i] = el; }} className="pd-layer" style={i > 1 ? { display: 'none' } : undefined}>
+            <div className="pd-breathe">
+              {/* soft blurred fill of the same photo, so the whole-photo view never shows empty bars */}
+              <img className="pd-fill" src={im.src} alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer" />
+              <img className="pd-main" src={im.src} srcSet={im.srcSet} sizes="100vw" alt="" decoding="async" loading={i < 2 ? 'eager' : 'lazy'} referrerPolicy="no-referrer"
+                onLoad={(e) => { e.currentTarget.classList.add('is-loaded'); window.dispatchEvent(new Event('scroll')); }}
+                ref={(img) => { mains.current[i] = img; if (img?.complete && img.naturalWidth) img.classList.add('is-loaded'); }} />
+            </div>
           </div>
         ))}
       </div>

@@ -89,7 +89,7 @@ export async function wikiSearch(q: string, signal?: AbortSignal): Promise<Place
     `&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=6&prop=description|coordinates|pageimages&piprop=thumbnail&pithumbsize=160`, signal);
   const toHits = (pages: Record<string, GenPage> = {}) => Object.values(pages)
     .sort((x, y) => (x.index ?? 0) - (y.index ?? 0))
-    .filter((p) => !/disambiguation/i.test(p.description ?? ''))
+    .filter((p) => !/disambiguation/i.test(`${p.title} ${p.description ?? ''}`))
     .map((p): PlaceHit => ({
       kind: p.coordinates?.[0] ? 'place' : 'topic', name: p.title, title: p.title, detail: p.description, thumb: p.thumbnail?.source,
       lat: p.coordinates?.[0]?.lat, lon: p.coordinates?.[0]?.lon,
@@ -106,9 +106,9 @@ export async function wikiSearch(q: string, signal?: AbortSignal): Promise<Place
   if (best && best.name.toLowerCase() !== q.trim().toLowerCase() && similarity(q, best.name) > 0.75) hits[0] = { ...best, suggested: true };
   const suggestion = j.query?.searchinfo?.suggestion;
   // Wikipedia's own "did you mean" when it has one.
-  if (suggestion && suggestion.toLowerCase() !== q.trim().toLowerCase() && !hits.some((h) => h.name.toLowerCase() === suggestion.toLowerCase())) {
+  if (suggestion && similarity(q, suggestion) >= 0.7 && suggestion.toLowerCase() !== q.trim().toLowerCase() && !hits.some((h) => h.name.toLowerCase() === suggestion.toLowerCase())) {
     const k = await run(suggestion).catch(() => null);
-    const extra = toHits(k?.query?.pages).map((h) => ({ ...h, suggested: true }));
+    const extra = toHits(k?.query?.pages).filter((h) => similarity(q, h.name) >= 0.8).map((h) => ({ ...h, suggested: true }));
     hits = [...extra.slice(0, 2), ...hits.filter((h) => !extra.some((e) => e.title === h.title))];
   }
   return hits.slice(0, 8);
@@ -182,19 +182,29 @@ export async function searchAnywhere(q: string, signal?: AbortSignal): Promise<P
   return res;
 }
 
-/** Places + Wikipedia together; tolerant of one source failing. */
-async function searchUncached(q: string, signal?: AbortSignal): Promise<PlaceHit[]> {
-  const [places, topics] = await Promise.allSettled([geocode(q, signal), wikiSearch(q, signal)]);
+/** Places first (deduplicated), then Wikipedia topics that are not the same place again. */
+export function mergeHits(placeList: PlaceHit[], topicList: PlaceHit[], query = ''): PlaceHit[] {
   const seen = new Set<string>();
-  const p = (places.status === 'fulfilled' ? places.value : []).filter((x) => {
+  const p = placeList.filter((x) => {
     const k = `${x.name}|${x.region}|${x.country}`.toLowerCase();
     return !seen.has(k) && seen.add(k);
   }).slice(0, 5);
-  const t = topics.status === 'fulfilled' ? topics.value : [];
-  // Drop topics that duplicate a place already listed.
   const names = new Set(p.map((x) => x.name.toLowerCase()));
-  return [...p, ...t.filter((x) => !names.has(x.name.toLowerCase().split(',')[0]))].slice(0, 8);
+  const all = [...p, ...topicList.filter((x) => !names.has(x.name.toLowerCase().split(',')[0]))].slice(0, 8);
+  // An exact match exists — no "did you mean" on anything else.
+  const exact = all.some((x) => !x.suggested && x.name.toLowerCase() === query.trim().toLowerCase());
+  return exact ? all.map((x) => (x.suggested ? { ...x, suggested: false } : x)) : all;
 }
+
+/** Places + Wikipedia together; tolerant of one source failing. */
+async function searchUncached(q: string, signal?: AbortSignal): Promise<PlaceHit[]> {
+  const [places, topics] = await Promise.allSettled([geocode(q, signal), wikiSearch(q, signal)]);
+  return mergeHits(places.status === 'fulfilled' ? places.value : [], topics.status === 'fulfilled' ? topics.value : [], q);
+}
+
+/** Cached result for a query, if this visit already searched it. */
+export const cachedSearch = (q: string) => searchCache.get(q.trim().toLowerCase());
+export const cacheSearch = (q: string, hits: PlaceHit[]) => { if (hits.length) searchCache.set(q.trim().toLowerCase(), hits); };
 
 export async function wikiSummary(title: string, signal?: AbortSignal): Promise<WikiSummary | null> {
   try {

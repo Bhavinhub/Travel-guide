@@ -975,21 +975,21 @@ html[data-motion='reduced'] .px-img { scale: none; translate: none !important; }
 .dhero .bg img.hero-whole, .trip-hero img.hero-whole { animation: none; }
 @media (max-width: 760px) { .hero-whole { left: 0; right: 0; margin-inline: auto; max-width: 80%; height: 50%; top: calc(var(--nav-h) + 12px); bottom: auto; opacity: .92; } }
 
-/* ═══════════ Cursor follow, liquid trail and click ripple ═══════════ */
-.cursor-fx { position: fixed; inset: 0; pointer-events: none; z-index: 120; }
-.cfx-trail { position: absolute; inset: 0; width: 100%; height: 100%; }
-.cfx-dot, .cfx-ring { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; transition: opacity .3s; will-change: transform; }
+/* ═══════════ Cursor: colour-inverting circle, dust trail and click ripple ═══════════ */
+/* The wrapper adds no stacking layer, so the circle can blend with the page itself. */
+.cursor-fx { display: contents; }
+.cfx-trail { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 120; pointer-events: none; }
+.cfx-dot, .cfx-ring { position: fixed; left: 0; top: 0; border-radius: 50%; opacity: 0; pointer-events: none; will-change: transform; transition: opacity .3s; }
 .cursor-fx-on .cfx-dot, .cursor-fx-on .cfx-ring { opacity: 1; }
-.cfx-dot { width: 8px; height: 8px; margin: -4px 0 0 -4px; background: #fff3d6; box-shadow: 0 0 12px 3px rgba(255, 210, 130, .9); }
-.cfx-ring { width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 1.5px solid rgba(255, 236, 200, .75);
-  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.22), rgba(255,255,255,.04) 60%); box-shadow: 0 0 18px rgba(244, 184, 96, .35), inset 0 1px 0 rgba(255,255,255,.5);
-  transition: opacity .3s, border-color .3s, background .3s; }
-.cfx-ring.is-hot { border-color: rgba(244, 184, 96, .95); background: radial-gradient(circle at 35% 30%, rgba(255, 220, 150, .35), rgba(244, 184, 96, .08) 60%); }
-html[data-theme='light'] .cfx-dot { background: #c47a00; box-shadow: 0 0 10px 2px rgba(196, 122, 0, .6); }
-html[data-theme='light'] .cfx-ring { border-color: rgba(19, 34, 29, .55); }
-@media (hover: none), (pointer: coarse) { .cursor-fx { display: none; } }
-@media (prefers-reduced-motion: reduce) { .cursor-fx { display: none; } }
-@media print { .cursor-fx { display: none; } }
+.cfx-dot { z-index: 122; width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #fff; mix-blend-mode: difference; }
+/* Like the reference: a solid white disc with "difference" blending — everything under it,
+   photos included, flips to its inverted colours; it swells over images and links. */
+.cfx-ring { z-index: 121; width: 56px; height: 56px; margin: -28px 0 0 -28px; background: #fff; mix-blend-mode: difference;
+  transition: opacity .3s, width .35s cubic-bezier(.2,.8,.2,1), height .35s cubic-bezier(.2,.8,.2,1), margin .35s cubic-bezier(.2,.8,.2,1); }
+.cfx-ring.is-hot { width: 92px; height: 92px; margin: -46px 0 0 -46px; }
+@media (hover: none), (pointer: coarse) { .cfx-trail, .cfx-dot, .cfx-ring { display: none; } }
+@media (prefers-reduced-motion: reduce) { .cfx-trail, .cfx-dot, .cfx-ring { display: none; } }
+@media print { .cfx-trail, .cfx-dot, .cfx-ring { display: none; } }
 
 .mapfly-map.leaflet-container { background: #22362f; }
 /* Readable text over the photo backgrounds: intro copy gets a glass panel. */
@@ -1034,3 +1034,175 @@ html[data-theme='light'] :is(.dhero, .trip-hero, .chapter, .top-card) .btn:not(.
 .maplibregl-ctrl-attrib { font-size: 10px; }
 .map-pin, .map-photo, .map-spot, .map-origin { cursor: pointer; }
 .nav-results a.is-active { background: rgba(255,255,255,.1); outline: 1px solid rgba(244,184,96,.5); } html[data-theme='light'] .nav-results a.is-active { background: rgba(13,42,34,.07); }
+
+/* 3D Earth map: loader, From/To panel, destination and tourist photo markers */
+.mapfly .mapfly-map { opacity: 0; transition: opacity .9s var(--ease); }
+.mapfly .mapfly-map.is-ready { opacity: 1; }
+.mapfly-loading { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; align-content: center; gap: 1rem; color: #dfe9f5; pointer-events: none; }
+.mf-earth { width: min(46vw, 260px); aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #8fd3ff 0%, #2a6fb0 32%, #12385f 62%, #061a2e 100%);
+  box-shadow: 0 0 60px 10px rgba(110, 180, 255, .35), inset -30px -20px 60px rgba(0,0,0,.6); animation: mfSpin 6s linear infinite, mfPulse 2.4s ease-in-out infinite; }
+@keyframes mfSpin { to { background-position: 200px 0; } }
+@keyframes mfPulse { 50% { box-shadow: 0 0 80px 18px rgba(110, 180, 255, .5), inset -30px -20px 60px rgba(0,0,0,.6); } }
+.mapfly-route-form { position: absolute; z-index: 6; left: 1rem; top: 3.4rem; display: flex; gap: .5rem; align-items: flex-end; padding: .5rem .6rem; border-radius: 16px; max-width: calc(100% - 2rem); flex-wrap: wrap; }
+.mf-field { position: relative; display: grid; gap: .15rem; min-width: 150px; flex: 1 1 150px; }
+.mf-field .input { padding: .4rem .6rem; min-height: 36px; font-size: .88rem; }
+.mf-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 9; display: grid; max-height: 240px; overflow: auto; border-radius: 12px; background: rgba(9, 19, 25, .97); box-shadow: 0 18px 40px -12px rgba(0,0,0,.8); }
+html[data-theme='light'] .mf-list { background: #fff; }
+.mf-list button { all: unset; cursor: pointer; padding: .5rem .7rem; font-size: .85rem; color: var(--glacier); }
+.mf-list button:hover, .mf-list button:focus-visible { background: rgba(244,184,96,.18); }
+.map-dest { cursor: pointer; position: relative; }
+.map-dest img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #f4dca0; box-shadow: 0 4px 14px rgba(0,0,0,.6); display: block; transition: transform .3s var(--ease); }
+.map-dest:hover img { transform: scale(1.35); }
+.map-dest b { position: absolute; left: 50%; top: 38px; transform: translateX(-50%); white-space: nowrap; font: 600 11px/1.2 system-ui; color: #fff; text-shadow: 0 1px 4px #000; opacity: 0; transition: opacity .25s; pointer-events: none; }
+.map-dest:hover b { opacity: 1; }
+.mapfly-map.is-close .map-dest { display: none; }
+.map-tour img { border-color: #7fd6c2; }
+@media (max-width: 640px) {
+  .mapfly-route-form { top: 3rem; left: .5rem; right: .5rem; padding: .4rem; }
+  .mf-field { min-width: 0; flex: 1 1 40%; }
+}
+.mapfly .mapfly-route-form { top: .7rem; }
+.mapfly .mapfly-route { left: auto; right: 1rem; top: .9rem; transform: none; }
+.mapfly .mapfly-hint { top: auto; bottom: 4.6rem; }
+.mapfly .mapfly-card { top: 4rem; }
+@media (max-width: 900px) {
+  .mapfly .mapfly-route { left: .5rem; right: .5rem; top: 7.2rem; white-space: normal; text-align: center; font-size: .74rem; }
+}
+@media (max-width: 640px) {
+  .mapfly .mapfly-route-form { top: .5rem; }
+  .mapfly .mapfly-card { top: auto; }
+}
+html body .mapfly .mapfly-card { background: rgba(8, 18, 24, .88); color: #fff; }
+html body .mapfly .mapfly-card .muted { color: #cfdcd6; }
+/* Like the reference video: a see-through disc that inverts what is beneath it. */
+.cfx-ring { background: rgba(255, 255, 255, .62); box-shadow: 0 0 0 1px rgba(255,255,255,.55) inset; }
+.cfx-ring.is-hot { background: rgba(255, 255, 255, .72); }
+.mapfly .mapfly-route-form { flex-wrap: nowrap; }
+.mapfly .mapfly-route-form .mf-field { min-width: 0; flex: 1 1 0; }
+.mapfly .mapfly-route-form > .btn { flex: none; align-self: flex-end; padding: .35rem .6rem; }
+html body .atmo-preview .label { background: rgba(8, 18, 24, .72); color: #f1f6f3; border-color: rgba(255,255,255,.25); }
+
+/* Background photos: clean and vivid, faded in once decoded (no visible drawing-in). */
+.pd-layer img { opacity: 0; transition: opacity .7s ease; }
+.pd-layer img.is-loaded { opacity: 1; }
+/* Home: text there is always light, so the photo needs only a soft shade behind it — never a white wash. */
+html body:has(.chapter) .pd-shade, html[data-theme='light'] body:has(.chapter) .pd-shade {
+  background: linear-gradient(180deg, rgba(4, 10, 18, .42) 0%, rgba(4, 10, 18, .08) 30%, rgba(4, 10, 18, .1) 60%, rgba(4, 10, 18, .5) 100%),
+              linear-gradient(90deg, rgba(4, 10, 18, .45) 0%, rgba(4, 10, 18, 0) 55%); }
+/* Other pages in Sun mode: a light, even veil — photos stay clear, dark text stays readable on its panels. */
+html[data-theme='light'] body:not(:has(.chapter)) .pd-shade { background: linear-gradient(180deg, rgba(241, 245, 242, .55), rgba(241, 245, 242, .18) 35%, rgba(241, 245, 242, .25) 65%, rgba(241, 245, 242, .7)); }
+/* Light-mode home headline: crisp white with a soft shadow on the clean photo. */
+html[data-theme='light'] .chapter h1, html[data-theme='light'] .chapter .lead, html[data-theme='light'] .hero-3d .eyebrow { text-shadow: 0 2px 18px rgba(0, 0, 0, .45); }
+
+/* Cursor, final: small ring by default; inverting disc only over photos; gold ring over links. */
+html body .cfx-ring { width: 26px; height: 26px; margin: -13px 0 0 -13px; background: transparent; mix-blend-mode: normal;
+  border: 1.5px solid rgba(255, 255, 255, .85); box-shadow: 0 0 0 1px rgba(0, 0, 0, .25), 0 0 10px rgba(255, 220, 160, .35);
+  transition: opacity .3s, width .3s cubic-bezier(.2,.8,.2,1), height .3s cubic-bezier(.2,.8,.2,1), margin .3s cubic-bezier(.2,.8,.2,1), background .25s, border-color .25s; }
+html body .cfx-ring.is-hot { width: 34px; height: 34px; margin: -17px 0 0 -17px; border-color: #f4b860; background: rgba(244, 184, 96, .12); }
+html body .cfx-ring.is-img { width: 48px; height: 48px; margin: -24px 0 0 -24px; border-color: transparent; box-shadow: none;
+  background: rgba(255, 255, 255, .62); mix-blend-mode: difference; }
+html[data-theme='light'] body .cfx-ring:not(.is-img):not(.is-hot) { border-color: rgba(19, 34, 29, .7); box-shadow: 0 0 0 1px rgba(255,255,255,.4); }
+html body .cfx-dot { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; }
+
+/* Water inside the cursor: a light, glassy aqua fill with soft ripples rolling outwards. */
+html body .cfx-ring.is-img {
+  background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, .95) 0%, rgba(214, 244, 255, .7) 30%, rgba(170, 225, 250, .5) 62%, rgba(235, 250, 255, .7) 100%);
+  overflow: hidden; }
+.cfx-ring::before, .cfx-ring::after { content: ''; position: absolute; inset: 22%; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .9);
+  opacity: 0; animation: cfxRipple 1.8s cubic-bezier(.2, .7, .3, 1) infinite; pointer-events: none; }
+.cfx-ring::after { animation-delay: .9s; }
+.cfx-ring.is-img::before, .cfx-ring.is-img::after { border-color: rgba(255, 255, 255, .95); border-width: 2px; }
+@keyframes cfxRipple { 0% { transform: scale(.25); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+/* The small default ring carries just a faint ripple. */
+html body .cfx-ring:not(.is-img)::before, html body .cfx-ring:not(.is-img)::after { inset: 30%; border-width: 1px; border-color: rgba(200, 238, 255, .7); }
+html[data-theme='light'] body .cfx-ring:not(.is-img)::before, html[data-theme='light'] body .cfx-ring:not(.is-img)::after { border-color: rgba(40, 120, 150, .55); }
+@media (prefers-reduced-motion: reduce) { .cfx-ring::before, .cfx-ring::after { animation: none; } }
+/* Softer, lighter colour change inside the water disc. */
+html body .cfx-ring.is-img { mix-blend-mode: exclusion; }
+
+/* ═══ Cursor over photos — matched to the reference video ═══
+   Bright white disc on the pointer (inverts beneath it) + a larger pale water lens trailing behind. */
+html body .cfx-ring.is-img { opacity: 0 !important; }
+html body .cfx-dot { transition: width .3s cubic-bezier(.2,.8,.2,1), height .3s cubic-bezier(.2,.8,.2,1), margin .3s cubic-bezier(.2,.8,.2,1), opacity .3s; }
+html body .cfx-dot.is-img { width: 40px; height: 40px; margin: -20px 0 0 -20px; background: #fff; mix-blend-mode: difference;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+.cfx-lens { position: fixed; left: 0; top: 0; z-index: 120; pointer-events: none; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%;
+  opacity: 0; transform-origin: 50% 50%; will-change: transform; transition: opacity .35s;
+  background: radial-gradient(circle at 38% 32%, rgba(255,255,255,.55) 0%, rgba(205,230,255,.32) 38%, rgba(170,205,245,.22) 66%, rgba(225,240,255,.4) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.45), inset -6px -8px 18px rgba(120,170,230,.25), 0 6px 24px rgba(160,200,255,.25);
+  backdrop-filter: blur(2px) saturate(140%); -webkit-backdrop-filter: blur(2px) saturate(140%); }
+.cursor-fx-on .cfx-lens.is-img { opacity: 1; }
+@media (hover: none), (pointer: coarse) { .cfx-lens { display: none; } }
+@media (prefers-reduced-motion: reduce) { .cfx-lens { display: none; } }
+@media print { .cfx-lens { display: none; } }
+
+/* Photos stay in full colour; under the cursor they shift into a richer, warmer colour grade. */
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-motion='reduced']) :is(.top-card, .card, .spot-card, .pg-item, .portal) img { transition: filter .6s cubic-bezier(.2,.8,.2,1), transform .8s var(--ease); }
+  html:not([data-motion='reduced']) :is(.top-card, .card, .spot-card, .pg-item, .portal):hover img { filter: saturate(1.55) contrast(1.08) brightness(1.06) hue-rotate(-10deg); }
+}
+
+/* ═══ Header: no shared bar — each control floats as its own 3D liquid-glass bubble ═══ */
+html body .nav.glass { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0 .2rem; }
+html body .nav.glass::before, html body .nav.glass::after { display: none; }
+.nav .brand, .nav .nav-links, .nav .menu-btn, .nav .theme-toggle, .nav .nav-search .input {
+  --lq-fill: linear-gradient(160deg, rgba(255,255,255,.26) 0%, rgba(255,255,255,.08) 38%, rgba(170,215,255,.10) 70%, rgba(255,255,255,.18) 100%);
+  background: var(--lq-fill), rgba(10, 22, 30, .42);
+  border: 1px solid rgba(255,255,255,.28);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -10px 18px -10px rgba(0,0,0,.45), inset 10px 0 20px -14px rgba(160,210,255,.45),
+              0 12px 30px -14px rgba(0,0,0,.65);
+  backdrop-filter: blur(16px) saturate(170%); -webkit-backdrop-filter: blur(16px) saturate(170%);
+  border-radius: 999px;
+}
+.nav .brand { padding: .35rem 1rem .35rem .35rem; }
+.nav .nav-links { padding: .25rem; }
+.nav .menu-btn { width: 44px; height: 44px; padding: 0; justify-content: center; }
+.nav .theme-toggle { padding: 5px; }
+.nav :is(.brand, .menu-btn, .theme-toggle) { transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s; }
+.nav :is(.brand, .menu-btn, .theme-toggle):hover { transform: translateY(-2px) scale(1.03); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.7), inset 0 -10px 18px -10px rgba(0,0,0,.45), 0 16px 34px -14px rgba(0,0,0,.7), 0 0 0 1px rgba(244,184,96,.35); }
+.nav .nav-tools { gap: .55rem; }
+html[data-theme='light'] .nav :is(.brand, .nav-links, .menu-btn, .theme-toggle, .nav-search .input) {
+  background: linear-gradient(160deg, rgba(255,255,255,.95), rgba(255,255,255,.55) 45%, rgba(220,238,255,.55) 75%, rgba(255,255,255,.8)); border-color: rgba(13,42,34,.12);
+  box-shadow: inset 0 1.5px 0 #fff, inset 0 -10px 18px -12px rgba(13,42,34,.2), 0 12px 26px -14px rgba(13,42,34,.45); }
+/* Rotating ring: GPU-friendly, and no colour filter on its moving cards (that caused the lag). */
+.ring { will-change: transform; }
+.ring-item { backface-visibility: hidden; }
+html:not([data-motion='reduced']) .ring-card img, html:not([data-motion='reduced']) .ring-card:hover img { filter: none; }
+
+/* One circle over photos: the water lens itself inverts what is beneath it (no second disc). */
+html body .cfx-dot.is-img { opacity: 0 !important; width: 6px; height: 6px; margin: -3px 0 0 -3px; }
+html body .cfx-lens { width: 58px; height: 58px; margin: -29px 0 0 -29px; mix-blend-mode: difference; backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: radial-gradient(circle at 40% 34%, #ffffff 0%, rgba(255,255,255,.92) 42%, rgba(225,240,255,.7) 70%, rgba(255,255,255,.35) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.9), 0 0 18px rgba(255,255,255,.35); }
+
+/* Real moments strip: one aligned row of equal photos gliding smoothly (no per-card depth offsets). */
+html body .marquee { transform: none; gap: 16px; align-items: stretch; animation: marqueeGlide 80s linear infinite; will-change: transform; }
+@keyframes marqueeGlide { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+html body .moment, html body .moment:nth-child(odd) { flex: none; width: 300px; height: 200px; aspect-ratio: auto; transform: none; }
+html body .moment:hover { transform: translateY(-6px) scale(1.03); }
+html body .marquee-scene { perspective: none; padding: 24px 0 30px; }
+/* Medium widths: search lives in the menu, the menu button shows just its icon — bubbles never crush. */
+@media (max-width: 980px) {
+  .nav > .nav-tools > .nav-search { display: none; }
+  .nav .menu-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+@media (max-width: 700px) { .nav .nav-tools > .btn-primary { display: none; } }
+.map-mover.is-arrived { visibility: hidden; }
+.mapfly.has-route { height: 460vh; } .mapfly:not(.has-route):not(.is-free):not(.is-static) { height: 300vh; }
+/* Continuous cinematic loop: every background photo slowly breathes in and out (on top of the scroll dolly). */
+.pd-layer img.is-loaded { animation: pdBreathe 16s ease-in-out infinite alternate; }
+@keyframes pdBreathe { from { transform: scale(1) translate3d(0, 0, 0); } to { transform: scale(1.08) translate3d(-1.2%, -0.8%, 0); } }
+html[data-motion='reduced'] .pd-layer img.is-loaded { animation: none; }
+@media (prefers-reduced-motion: reduce) { .pd-layer img.is-loaded { animation: none; } }
+.mapfly .mapfly-card.is-on { pointer-events: auto; }
+.mapfly .mf-visit { margin-top: .45rem; align-self: flex-start; }
+@media (max-width: 640px) { .mapfly .mf-visit { display: none; } }
+
+/* Background scenes: whole photo over a blurred fill of itself; the camera zooms from "all of it" to "into it". */
+.pd-breathe { position: absolute; inset: 0; overflow: hidden; animation: pdBreathe 18s ease-in-out infinite alternate; will-change: transform; }
+.pd-layer .pd-fill { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; filter: blur(30px) saturate(130%) brightness(.72); transform: scale(1.1); opacity: 1; animation: none; }
+.pd-layer .pd-main { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 50%; will-change: transform; animation: none; }
+.pd-layer .pd-main.is-loaded { opacity: 1; animation: none; }
+html[data-motion='reduced'] .pd-breathe { animation: none; }
+@media (prefers-reduced-motion: reduce) { .pd-breathe { animation: none; } }

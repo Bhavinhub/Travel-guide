@@ -12,7 +12,7 @@ export function installReveal() {
     });
   }, { rootMargin: '0px 0px -4% 0px', threshold: 0 });
   const SEL = 'main .card, main .glass, main .grid > *, main .tl-item, main .day';
-  const SKIP = '.planner aside, .portal-overlay, .chapter-nav, [data-no-reveal], .dock, .nav, .lightbox, .drawer';
+  const SKIP = '.planner aside, .portal-overlay, .chapter-nav, [data-no-reveal], .dock, .nav, .lightbox, .drawer, .mapfly';
   const scan = (root: ParentNode) => {
     root.querySelectorAll<HTMLElement>(SEL).forEach((el) => {
       if (el.dataset.revealed || el.closest(SKIP)) return;

@@ -187,7 +187,7 @@ export default function DestinationPage({ id }: { id: string }) {
         <LiveWeather d={d} />
         <div>
           <h2 style={{ fontSize: '1.8rem' }}>{d.name} from above</h2>
-          <MapFlyIn lat={d.lat} lon={d.lon} name={d.name} zoomTo={d.kind === 'city' ? 12.5 : 13} from={getDeparture(nearestDeparture(d))} />
+          <MapFlyIn lat={d.lat} lon={d.lon} name={d.name} zoomTo={d.kind === 'city' || d.kind === 'city-state' ? 14 : 16} from={getDeparture(nearestDeparture(d))} />
         </div>
         <TripExplorer d={d} />
 

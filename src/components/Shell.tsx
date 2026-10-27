@@ -7,7 +7,7 @@ import { searchDestinations } from '../data/catalog';
 import { localImages, srcOf } from '../lib/localMedia';
 import { useMoney } from '../lib/store';
 import { quickEstimate } from '../lib/tiers';
-import { clearSearches, placeHref, recentSearches, rememberSearch, searchAnywhere, type PlaceHit, type RecentSearch } from '../lib/places';
+import { cacheSearch, cachedSearch, clearSearches, geocode, mergeHits, placeHref, recentSearches, rememberSearch, wikiSearch, type PlaceHit, type RecentSearch } from '../lib/places';
 
 /**
  * Search anything: curated destinations first (with instant 1-day / 2-day estimates), then live
@@ -20,19 +20,30 @@ function NavSearch({ id = 'nav-q' }: { id?: string }) {
   const [recent, setRecent] = useState<RecentSearch[]>(recentSearches);
   const [active, setActive] = useState(-1);
   const pendingEnter = useRef(false);
+  const picked = useRef(false);
   const money = useMoney();
   const term = q.trim();
   const curated = term.length >= 2 ? searchDestinations(term).slice(0, 4) : [];
   useEffect(() => {
     setActive(-1);
     if (term.length < 2) { setLive({ q: '', hits: [], loading: false }); return; }
+    const notCurated = (hs: PlaceHit[]) => hs.filter((h) => !curated.some((d) => d.name.toLowerCase() === h.name.toLowerCase()));
+    const cached = cachedSearch(term);
+    if (cached) { setLive({ q: term, hits: notCurated(cached), loading: false }); return; }
     const ctl = new AbortController();
     setLive((l) => ({ ...l, loading: true }));
+    // Show places the moment they arrive; Wikipedia topics join when ready.
     const t = setTimeout(() => {
-      searchAnywhere(term, ctl.signal)
-        .then((hits) => !ctl.signal.aborted && setLive({ q: term, hits: hits.filter((h) => !curated.some((d) => d.name.toLowerCase() === h.name.toLowerCase())), loading: false }))
-        .catch(() => !ctl.signal.aborted && setLive({ q: term, hits: [], loading: false }));
-    }, 220);
+      let places: PlaceHit[] = [], topics: PlaceHit[] = [], pending = 2;
+      const update = () => {
+        if (ctl.signal.aborted) return;
+        const hits = mergeHits(places, topics, term);
+        if (!pending) cacheSearch(term, hits);
+        setLive({ q: term, hits: notCurated(hits), loading: pending > 0 });
+      };
+      geocode(term, ctl.signal).then((x) => { places = x; }).catch(() => undefined).finally(() => { pending--; update(); });
+      wikiSearch(term, ctl.signal).then((x) => { topics = x; }).catch(() => undefined).finally(() => { pending--; update(); });
+    }, 160);
     return () => { clearTimeout(t); ctl.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [term]);
@@ -78,11 +89,14 @@ function NavSearch({ id = 'nav-q' }: { id?: string }) {
   useEffect(() => { document.getElementById(`${id}-opt-${active}`)?.scrollIntoView({ block: 'nearest' }); }, [active, id]);
   // Keeping focus in the box while a suggestion is pressed: Safari does not focus links on click,
   // so without this the box blurs, the list closes and the click never lands.
-  const keepFocus = (e: React.MouseEvent) => e.preventDefault();
+  const keepFocus = (e: React.MouseEvent) => { e.preventDefault(); picked.current = false; };
   const optProps = (i: number, to: string) => ({
     id: `${id}-opt-${i}`, role: 'option', 'aria-selected': active === i, className: active === i ? 'is-active' : undefined,
     href: href(to), onMouseDown: keepFocus, onMouseEnter: () => setActive(i),
-    onClick: (e: React.MouseEvent) => { e.preventDefault(); pick(i); },
+    // Mouse/pen: open on release, even if the list re-drew under the pointer since it was pressed.
+    onPointerUp: (e: React.PointerEvent) => { if (e.pointerType !== 'touch' && e.button === 0) { e.preventDefault(); picked.current = true; pick(i); } },
+    // Touch and keyboard activation.
+    onClick: (e: React.MouseEvent) => { e.preventDefault(); if (!picked.current) pick(i); picked.current = false; },
   });
   let n = 0;
   return (

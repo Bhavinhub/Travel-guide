@@ -136,44 +136,70 @@ export function PhotoStage({ chapters, active, motion }: { chapters: StageChapte
 export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: Destination[]; onOpen: (d: Destination, e: { clientX: number; clientY: number }) => void; motion: boolean; label: string; subtitle: (d: Destination) => string }) {
   const ring = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-  const [hold, setHold] = useState(false);
+  // Live interaction state lives in refs, so hovering never restarts the animation (it used to snap back).
+  const over = useRef(false);
+  const overCard = useRef(false);
   const n = items.length;
   const cardW = 230;
   const radius = Math.round(cardW / 2 / Math.tan(Math.PI / n) + 60);
   useEffect(() => {
-    let a = 0, speed = 6, target = 6, raf = 0, last = performance.now();
+    let a = 0, speed = 6, target = 6, raf = 0, last = performance.now(), visible = false;
     const onMove = (e: PointerEvent) => {
       const r = wrap.current?.getBoundingClientRect();
-      if (!r || e.clientY < r.top - 100 || e.clientY > r.bottom + 100) return;
-      target = ((e.clientX - (r.left + r.width / 2)) / (r.width / 2)) * 22; // deg/sec, signed
+      if (!r || e.clientY < r.top - 100 || e.clientY > r.bottom + 100) { target = 6; return; }
+      // Steer: cursor left/right of centre turns the ring that way, faster towards the edges;
+      // a calm zone in the middle lets it glide to a stop so a card is easy to click.
+      const off = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+      const calm = Math.abs(off) < 0.18 ? 0 : (Math.abs(off) - 0.18) / 0.82;
+      target = Math.sign(off) * calm * calm * 45;
     };
     const tick = (t: number) => {
+      raf = 0;
       const dt = Math.min(0.05, (t - last) / 1000);
       last = t;
-      speed += ((hold ? 0 : target) - speed) * 0.05;
-      a += speed * dt;
+      const goal = over.current ? target : 6; // the calm zone in the middle is what stops it for clicking
+      if (over.current && Math.abs(target) < 0.5 && Math.abs(speed) < 4) {
+        // Resting in the calm zone: settle so a card faces you squarely (never a gap in the middle).
+        const step = 360 / n, nearest = Math.round(a / step) * step;
+        a += (nearest - a) * (1 - Math.exp(-dt * 6));
+        speed *= 0.8;
+      } else {
+        speed += (goal - speed) * (1 - Math.exp(-dt * 4));
+        a += speed * dt;
+      }
       if (ring.current) ring.current.style.transform = `translateZ(${-radius}px) rotateY(${-a}deg)`;
-      raf = requestAnimationFrame(tick);
+      if (visible) raf = requestAnimationFrame(tick);
     };
+    // Animate only while the ring is on screen.
+    const io = new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting;
+      if (visible && motion && !raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
+    }, { rootMargin: '100px 0px' });
     if (motion) {
-      raf = requestAnimationFrame(tick);
+      if (wrap.current) io.observe(wrap.current);
       addEventListener('pointermove', onMove, { passive: true });
     } else if (ring.current) ring.current.style.transform = `translateZ(${-radius}px)`;
     return () => {
       cancelAnimationFrame(raf);
+      io.disconnect();
       removeEventListener('pointermove', onMove);
     };
-  }, [motion, hold, radius]);
+  }, [motion, radius, n]);
   return (
-    <div className="ring-wrap" ref={wrap} onMouseEnter={() => setHold(true)} onMouseLeave={() => setHold(false)} onFocus={() => setHold(true)} onBlur={() => setHold(false)}>
+    <div className="ring-wrap" ref={wrap} onPointerEnter={() => { over.current = true; }} onPointerLeave={() => { over.current = false; overCard.current = false; }}>
       <div className="ring-scene" style={{ ['--r' as string]: `${radius}px` }}>
         <div className="ring" ref={ring} role="list" aria-label={label}>
           {items.map((d, i) => {
             const img = localImages(d.id)[0];
             return (
               <div role="listitem" key={d.id} className="ring-item" style={{ transform: `rotateY(${(360 / n) * i}deg) translateZ(${radius}px)` }}>
-                <button className="ring-card" onClick={(e) => onOpen(d, e)} style={{ ['--pa' as string]: d.accent }}>
-                  {img ? <img src={srcOf(img, 'card')} alt="" loading="lazy" /> : <span className="photo-missing" />}
+                <button className="ring-card" style={{ ['--pa' as string]: d.accent }}
+                  onPointerEnter={() => { overCard.current = true; }} onPointerLeave={() => { overCard.current = false; }}
+                  onFocus={() => { overCard.current = true; }} onBlur={() => { overCard.current = false; }}
+                  // Mouse: open on release, even if the ring nudged the card a little while pressing.
+                  onPointerUp={(e) => { if (e.pointerType !== 'touch' && e.button === 0) onOpen(d, e); }}
+                  onClick={(e) => { if (e.detail === 0 || (e.nativeEvent as PointerEvent).pointerType === 'touch') onOpen(d, e); }}>
+                  {img ? <img src={srcOf(img, 'card')} alt="" loading="lazy" draggable={false} /> : <span className="photo-missing" />}
                   <span className="ring-meta"><b>{d.name}</b><small>{subtitle(d)}</small></span>
                 </button>
               </div>
@@ -181,7 +207,7 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
           })}
         </div>
       </div>
-      <p className="tiny muted ring-hint">Move the cursor left or right to steer · hover to pause · every photo is real (Wikimedia Commons)</p>
+      <p className="tiny muted ring-hint">Move the cursor left or right to turn the ring · hold near the centre to stop · click a photo to open it</p>
     </div>
   );
 }
