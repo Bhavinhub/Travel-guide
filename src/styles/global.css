@@ -1565,3 +1565,6 @@ html body .mapfly .mapfly-card { bottom: 4.2rem; top: auto; }
 html[data-theme='light'] .mf-travel { background: rgba(13,42,34,.06); }
 html[data-theme='light'] .mf-travel-btn { color: #2b3f4b; }
 html body .map-mover.is-arrived { visibility: visible; }
+.mf-travel { grid-template-columns: repeat(3, 1fr); }
+/* Multi-leg journeys: the route summary may run over two lines. */
+html body .mapfly .mapfly-route { white-space: normal; line-height: 1.35; text-align: center; max-width: min(640px, calc(100% - 2rem)); }

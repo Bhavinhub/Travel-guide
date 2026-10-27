@@ -6,6 +6,7 @@ import { localImages, srcOf } from '../lib/localMedia';
 import { geocode, nearbySpots, placeHref, SACRED_OR_SCENIC, SCENIC_STOP, type NearbySpot } from '../lib/places';
 import { href, navigate } from '../lib/router';
 import { prefetchArrival, prefetchCorridor, saveTripOffline } from '../lib/offlineMap';
+import { nearestAirport, type Airport } from '../data/airports';
 import { useMotion } from '../lib/store';
 
 /**
@@ -88,6 +89,9 @@ const VEHICLE: Record<Exclude<Travel, 'auto'>, { icon: string; label: string }> 
   flight: { icon: '✈️', label: 'Flight' }, walk: { icon: '🚶', label: 'On foot' },
 };
 
+/** One stretch of a journey travelled one way (e.g. fly Delhi → Dehradun, then drive to Rishikesh). */
+interface Leg { travel: Exclude<Travel, 'auto'>; from: number; to: number; km: number; hours: number; title?: string }
+
 interface Route {
   pts: [number, number][]; cum: number[]; mode: 'road' | 'air'; km: number; hours?: number;
   /** What actually travels this route (the moving icon and the label). */
@@ -96,6 +100,8 @@ interface Route {
   note?: string;
   /** Where the road ends and a footpath continues (index into pts), e.g. the Kedarnath trek. */
   walkFrom?: number; walkKm?: number; walkHours?: number;
+  /** The journey's stretches in order; a single-mode trip has one (plus a walk when the road stops short). */
+  legs?: Leg[];
 }
 
 function buildRoute(pts: [number, number][], mode: Route['mode'], km?: number, hours?: number): Route {
@@ -104,17 +110,41 @@ function buildRoute(pts: [number, number][], mode: Route['mode'], km?: number, h
   return { pts, cum, mode, km: km ?? cum[cum.length - 1], hours };
 }
 
+/** The legs of a route (older single-mode routes get them derived). */
+function legsOf(r: Route): Leg[] {
+  if (r.legs?.length) return r.legs;
+  const last = r.pts.length - 1, t = r.travel ?? (r.mode === 'air' ? 'flight' : 'car');
+  if (r.walkFrom === undefined) return [{ travel: t, from: 0, to: last, km: r.km, hours: r.hours ?? 0 }];
+  return [{ travel: t, from: 0, to: r.walkFrom, km: r.km - (r.walkKm ?? 0), hours: r.hours ?? 0 }, { travel: 'walk', from: r.walkFrom, to: last, km: r.walkKm ?? 0, hours: r.walkHours ?? 0 }];
+}
+
 /**
- * Travel progress → distance progress. With a walking leg the journey gives the footpath a larger
- * share of the time than its length, so the walker visibly moves slower than the car did.
+ * Travel progress → distance progress, leg by leg: every leg gets a fair share of the playback (a long flight
+ * doesn't swallow the drive after it), walking gets extra time so the walker visibly moves slower, flights less.
  */
 function travelToDistance(r: Route, t: number) {
-  if (r.walkFrom === undefined) return clamp(t);
-  const total = r.cum[r.cum.length - 1], driveFrac = r.cum[r.walkFrom] / total;
-  const tDrive = 0.7; // first 70% of the travel time drives the road; the last 30% walks the path
-  return t <= tDrive ? (t / tDrive) * driveFrac : driveFrac + ((t - tDrive) / (1 - tDrive)) * (1 - driveFrac);
+  const legs = legsOf(r), total = r.cum[r.cum.length - 1] || 1;
+  const pace = { walk: 2.2, bike: 1.3, car: 1, train: 1, flight: 0.55 } as const;
+  const raw = legs.map((l) => Math.sqrt(Math.max(0.5, r.cum[l.to] - r.cum[l.from])) * pace[l.travel]);
+  const sum = raw.reduce((x, y) => x + y, 0) || 1;
+  let w = raw.map((x) => Math.max(0.12, x / sum));
+  const s2 = w.reduce((x, y) => x + y, 0); w = w.map((x) => x / s2);
+  let acc = 0;
+  for (let k = 0; k < legs.length; k++) {
+    if (t <= acc + w[k] || k === legs.length - 1) {
+      const local = clamp((t - acc) / (w[k] || 1)), l = legs[k];
+      return (r.cum[l.from] + (r.cum[l.to] - r.cum[l.from]) * local) / total;
+    }
+    acc += w[k];
+  }
+  return clamp(t);
 }
-const isWalking = (r: Route, distFrac: number) => r.walkFrom !== undefined && distFrac * r.cum[r.cum.length - 1] >= r.cum[r.walkFrom] - 1e-6;
+/** The leg being travelled at a distance fraction. */
+function legAt(r: Route, distFrac: number): Leg {
+  const legs = legsOf(r), d = distFrac * (r.cum[r.cum.length - 1] || 1);
+  return legs.find((l) => d <= r.cum[l.to] + 1e-6) ?? legs[legs.length - 1];
+}
+const isWalking = (r: Route, distFrac: number) => legAt(r, distFrac).travel === 'walk';
 
 /** Point and index at fraction t of the route length (binary search: routes have thousands of points). */
 function along(r: Route, t: number): { p: [number, number]; i: number; f: number } {
@@ -146,40 +176,95 @@ async function osrm(profile: 'car' | 'bike' | 'foot', a: [number, number], b: [n
   return g?.geometry?.coordinates?.length > 1 ? { pts: thin(toPts(g.geometry.coordinates)), km: g.distance / 1000, hours: g.duration / 3600 } : null;
 }
 
-async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSignal, travel: Travel = 'auto'): Promise<Route> {
+const hmText = (h = 0) => { const H = Math.floor(h), M = Math.round((h % 1) * 60); return H ? `${H} h${M ? ` ${M} min` : ''}` : `${M} min`; };
+
+/** Road / bike / foot / train route, with a walk at the end when the road stops short of the place. */
+async function groundRoute(want: 'car' | 'bike' | 'walk' | 'train', a: [number, number], to: [number, number], signal: AbortSignal, note?: string): Promise<Route | null> {
+  const crow = kmBetween(a, to);
+  const profile = want === 'walk' ? 'foot' : want === 'bike' ? 'bike' : 'car';
+  const g = await osrm(profile, a, to, signal).catch(() => null);
+  if (!g || g.km > crow * 2.2 + 40) return null;
+  // Trains: no open rail routing exists — follow the main road corridor and use typical train timing.
+  const hours = want === 'train' ? g.km / 55 + 0.5 : g.hours;
+  if (want === 'train') note = note ?? 'Approximate line along the main corridor';
+  const end = g.pts[g.pts.length - 1], gap = kmBetween(end, to);
+  if (want !== 'walk' && gap > 0.6 && gap < 40) {
+    const w = await osrm('foot', end, to, signal).catch(() => null);
+    const walk = w?.pts ?? [end, to];
+    const route = buildRoute([...g.pts, ...walk.slice(1)], 'road', g.km + (w ? w.km : gap), hours);
+    return { ...route, travel: want, note, walkFrom: g.pts.length - 1, walkKm: w ? w.km : gap, walkHours: w ? w.hours : gap / 4 };
+  }
+  return { ...buildRoute(g.pts, 'road', g.km, hours), travel: want, note };
+}
+
+/** Fly between the airports nearest each end, with the drive to the airport and onwards from it. */
+async function flyRoute(a: [number, number], to: [number, number], A: Airport & { km: number }, B: Airport & { km: number }, signal: AbortSignal, note?: string, names: { from?: string; to?: string } = {}): Promise<Route> {
+  const legs: Leg[] = [];
+  const Ap: [number, number] = [A.lat, A.lon], Bp: [number, number] = [B.lat, B.lon];
+  let pts: [number, number][] = [a];
+  if (A.km >= 20) {
+    const g = await osrm('car', a, Ap, signal).catch(() => null);
+    pts = g?.pts ?? [a, Ap];
+    legs.push({ travel: 'car', from: 0, to: pts.length - 1, km: g?.km ?? A.km, hours: g?.hours ?? A.km / 40, title: `${names.from ?? 'Start'} → ${A.code} airport` });
+  }
+  const f0 = pts.length - 1, fkm = kmBetween(Ap, Bp);
+  pts = [...pts, ...arc(pts[f0], Bp).slice(1)];
+  legs.push({ travel: 'flight', from: f0, to: pts.length - 1, km: fkm, hours: fkm / 700 + 0.6, title: `Flight ${A.code} → ${B.code}` });
+  let walkFrom: number | undefined, walkKm: number | undefined, walkHours: number | undefined;
+  if (kmBetween(Bp, to) > 2) {
+    const g = await osrm('car', Bp, to, signal).catch(() => null);
+    const p = g?.pts ?? [Bp, to], s0 = pts.length - 1;
+    pts = [...pts, ...p.slice(1)];
+    legs.push({ travel: 'car', from: s0, to: pts.length - 1, km: g?.km ?? B.km, hours: g?.hours ?? B.km / 40, title: `${B.code} airport → ${names.to ?? 'destination'}` });
+    const end = pts[pts.length - 1], gap = kmBetween(end, to);
+    if (gap > 0.6 && gap < 40) {
+      const w = await osrm('foot', end, to, signal).catch(() => null);
+      const wp = w?.pts ?? [end, to], s1 = pts.length - 1;
+      pts = [...pts, ...wp.slice(1)];
+      walkFrom = s1; walkKm = w?.km ?? gap; walkHours = w?.hours ?? gap / 4;
+      legs.push({ travel: 'walk', from: s1, to: pts.length - 1, km: walkKm, hours: walkHours });
+    }
+  }
+  const km = legs.reduce((x, l) => x + l.km, 0), hours = legs.reduce((x, l) => x + l.hours, 0) + 1.25; // + check-in & boarding
+  return { ...buildRoute(pts, 'road', km, hours), travel: 'flight', note, legs, walkFrom, walkKm, walkHours };
+}
+
+/**
+ * The journey for a way of travel. "Auto" compares door-to-door times and picks the best: e.g. Delhi → Rishikesh
+ * flies Delhi → Dehradun (Jolly Grant) and drives the last stretch, while Bengaluru → Coorg simply drives.
+ */
+async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSignal, travel: Travel = 'auto', toName?: string): Promise<Route> {
   const a: [number, number] = [from.lat, from.lon];
   const crow = kmBetween(a, to);
-  const flight = (note?: string): Route => ({ ...buildRoute(arc(a, to), 'air', crow, crow / 750 + 1.5), travel: 'flight', note });
-  if (travel === 'flight') return flight();
+  const arcOnly = (note?: string): Route => ({ ...buildRoute(arc(a, to), 'air', crow, crow / 750 + 1.5), travel: 'flight', note });
+  const A = nearestAirport(a, 120), B = nearestAirport(to, 160);
+  const canFly = !!(A && B && A.code !== B.code && kmBetween([A.lat, A.lon], [B.lat, B.lon]) >= 150);
+  if (travel === 'flight') return canFly ? flyRoute(a, to, A!, B!, signal, undefined, { from: from.name, to: toName }) : arcOnly(crow < 150 ? 'Too short for a flight — shown as a direct line' : undefined);
+  if (travel === 'auto') {
+    const road = crow < 1800 ? await groundRoute('car', a, to, signal) : null;
+    if (canFly) {
+      const fkm = kmBetween([A!.lat, A!.lon], [B!.lat, B!.lon]);
+      const flyHours = A!.km / 40 + 1.25 + fkm / 700 + 0.6 + B!.km / 40;
+      const roadHours = road?.hours ?? Infinity;
+      if (!road || roadHours > flyHours * 1.15) {
+        // The straight-line estimate can't see mountain roads: compare the real door-to-door times, treks included.
+        const fly = await flyRoute(a, to, A!, B!, signal, undefined, { from: from.name, to: toName });
+        const roadTotal = roadHours + (road?.walkHours ?? 0), flyTotal = fly.hours ?? Infinity;
+        if (!road || roadTotal > flyTotal * 1.15) return { ...fly, note: road ? `Best way · by road it takes about ${hmText(roadTotal)}` : undefined };
+      }
+    }
+    if (road) return road;
+    return arcOnly();
+  }
   // Walking or cycling a very long way isn't realistic — use the road instead and say so.
-  let want: Exclude<Travel, 'auto' | 'flight'> = travel === 'auto' ? 'car' : travel;
+  let want: 'car' | 'bike' | 'walk' | 'train' = travel;
   let note: string | undefined;
   if (want === 'walk' && crow > 150) { want = 'car'; note = 'Too far to walk — shown by road'; }
   if (want === 'bike' && crow > 600) { want = 'car'; note = 'Too far to cycle — shown by road'; }
-  if (travel === 'auto' && crow >= 800) return flight();
-  if (want !== 'train' && crow > 2500) return flight('Too far overland — shown as a flight');
-  try {
-    const profile = want === 'walk' ? 'foot' : want === 'bike' ? 'bike' : 'car';
-    const g = await osrm(profile, a, to, signal);
-    if (g && g.km < crow * 2.2 + 40) {
-      // Trains: no open rail routing exists — follow the main road corridor and use typical train timing.
-      const hours = want === 'train' ? g.km / 55 + 0.5 : g.hours;
-      if (want === 'train') note = note ?? 'Approximate line along the main corridor';
-      const base = { ...buildRoute(g.pts, 'road', g.km, hours), travel: want, note } as Route;
-      // The road stops short of the place (a trek, a pilgrim path, a pedestrian old town)? Walk the rest.
-      const end = g.pts[g.pts.length - 1], gap = kmBetween(end, to);
-      if (want !== 'walk' && gap > 0.6 && gap < 40) {
-        try {
-          const w = await osrm('foot', end, to, signal);
-          const walk = w?.pts ?? [end, to];
-          const route = buildRoute([...g.pts, ...walk.slice(1)], 'road', g.km + (w ? w.km : gap), hours);
-          return { ...route, travel: want, note, walkFrom: g.pts.length - 1, walkKm: w ? w.km : gap, walkHours: w ? w.hours : gap / 4 };
-        } catch { /* no footpath data: draw the route only */ }
-      }
-      return base;
-    }
-  } catch { /* fall back to a flight arc */ }
-  return flight(travel === 'auto' ? undefined : 'No route found — shown as a flight');
+  if (want !== 'train' && crow > 2500) return canFly ? flyRoute(a, to, A!, B!, signal, 'Too far overland — shown as a flight', { from: from.name, to: toName }) : arcOnly('Too far overland — shown as a flight');
+  const g = await groundRoute(want, a, to, signal, note);
+  if (g) return g;
+  return canFly ? flyRoute(a, to, A!, B!, signal, 'No route found — shown as a flight', { from: from.name, to: toName }) : arcOnly('No route found — shown as a flight');
 }
 
 export interface RouteStop extends NearbySpot { frac: number; kmFromStart: number }
@@ -187,7 +272,7 @@ export interface RouteStop extends NearbySpot { frac: number; kmFromStart: numbe
 /** Beautiful places along the way: sample the route and pick the most scenic photographed spot near each sample. */
 async function scenicStops(r: Route, from: MapOrigin, to: [number, number], signal: AbortSignal): Promise<RouteStop[]> {
   const total = r.cum[r.cum.length - 1];
-  const samples = (r.mode === 'air' ? [] : [0.1, 0.19, 0.28, 0.37, 0.46, 0.55, 0.64, 0.73, 0.82, 0.91]).map((f) => along(r, f).p);
+  const samples = (r.mode === 'air' ? [] : [0.1, 0.19, 0.28, 0.37, 0.46, 0.55, 0.64, 0.73, 0.82, 0.91].filter((f) => legAt(r, f).travel !== 'flight')).map((f) => along(r, f).p);
   const found = await Promise.all(samples.map((p) => nearbySpots(p[0], p[1], signal).catch(() => [] as NearbySpot[])));
   const out: RouteStop[] = [];
   found.forEach((list) => {
@@ -471,7 +556,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     if (!from) return;
     const ctl = new AbortController();
     const markers: Marker[] = [];
-    fetchRoute(from, [lat, lon], ctl.signal, travel).then((r) => {
+    fetchRoute(from, [lat, lon], ctl.signal, travel, name).then((r) => {
       const m = map.current;
       if (ctl.signal.aborted || !m) return;
       const draw = () => {
@@ -486,7 +571,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const c = cam?.center as maplibregl.LngLat | undefined;
         // Flights sweep across continents: drop stale tile requests so the visible area loads first.
         // Road trips move slowly enough to keep every request (no half-loaded patches).
-        m.cancelPendingTileRequestsWhileZooming = r.mode === 'air';
+        m.cancelPendingTileRequestsWhileZooming = legsOf(r).some((l) => l.travel === 'flight');
         prefetchCorridor(r.pts);
         routeRef.current = { r, fit: { center: c ? [c.lng, c.lat] : [(lon + from.lon) / 2, (lat + from.lat) / 2], zoom: Math.min(zoomTo - 2, cam?.zoom ?? 5) }, mc: mercatorCum(r.pts) };
         const o = document.createElement('div');
@@ -495,7 +580,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         markers.push(new maplibregl.Marker({ element: o }).setLngLat([from.lon, from.lat]).addTo(m));
         const mv = document.createElement('div');
         mv.className = 'map-mover';
-        mv.textContent = VEHICLE[r.travel ?? (r.mode === 'air' ? 'flight' : 'car')].icon;
+        mv.textContent = VEHICLE[legsOf(r)[0].travel].icon;
         mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
         markers.push(mover.current);
         doneState.current = { n: -1, t: -1 };
@@ -575,7 +660,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const f = travelToDistance(rr.r, smooth(t)); // the walking stretch takes longer than its length
         const walking = isWalking(rr.r, f);
         const mv = mover.current?.getElement();
-        if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : VEHICLE[rr.r.travel ?? (rr.r.mode === 'air' ? 'flight' : 'car')].icon; }
+        const leg = legAt(rr.r, f);
+        if (mv && mv.dataset.mode !== leg.travel) { mv.dataset.mode = leg.travel; mv.textContent = VEHICLE[leg.travel].icon; }
         const at = along(rr.r, f), pt = at.p;
         const ahead = along(rr.r, Math.min(1, f + 0.04)).p;
         center = [lerp(rr.fit.center[0], pt[1], e), lerp(rr.fit.center[1], pt[0], e)];
@@ -785,9 +871,11 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
 
   const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
 
-  const hm = (h = 0) => `${Math.floor(h)} h ${Math.round((h % 1) * 60)} min`;
+  const hm = hmText;
   const routeLabel = route && from
-    ? `${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].icon} ${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].label} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · ${hm(route.hours)}` : ''}${route.walkKm ? `  ·  🥾 Trek ${route.walkKm.toFixed(1)} km · ${hm(route.walkHours)}` : ''}${route.note ? `  ·  ${route.note}` : ''}`
+    ? (route.legs && route.legs.length > 1
+      ? `${route.legs.map((l) => `${VEHICLE[l.travel].icon} ${l.title ?? VEHICLE[l.travel].label} · ${Math.round(l.km).toLocaleString('en-IN')} km · ${hm(l.hours)}`).join('  →  ')}  ·  total about ${hm(route.hours)}${route.note ? `  ·  ${route.note}` : ''}`
+      : `${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].icon} ${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].label} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · ${hm(route.hours)}` : ''}${route.walkKm ? `  ·  🥾 Trek ${route.walkKm.toFixed(1)} km · ${hm(route.walkHours)}` : ''}${route.note ? `  ·  ${route.note}` : ''}`)
     : null;
 
   return (
@@ -823,9 +911,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           {menuOpen && (
             <div className="mf-options" role="menu" aria-label="Map options">
               <div className="mf-travel" role="group" aria-label="How you travel">
-                {(['car', 'bike', 'train', 'flight', 'walk'] as const).map((t) => {
-                  const on = (route?.travel ?? (travel === 'auto' ? null : travel)) === t;
-                  return <button key={t} role="menuitemradio" aria-checked={on} className={`mf-travel-btn${on ? ' is-on' : ''}`} title={VEHICLE[t].label} onClick={() => { autoplay.current = true; setTravel(t); setMenuOpen(false); }}><span aria-hidden>{VEHICLE[t].icon}</span><small>{t === 'walk' ? 'Walk' : VEHICLE[t].label}</small></button>;
+                {(['auto', 'car', 'bike', 'train', 'flight', 'walk'] as const).map((t) => {
+                  const on = travel === t;
+                  const icon = t === 'auto' ? '✨' : VEHICLE[t].icon, text = t === 'auto' ? 'Best' : t === 'walk' ? 'Walk' : VEHICLE[t].label;
+                  return <button key={t} role="menuitemradio" aria-checked={on} className={`mf-travel-btn${on ? ' is-on' : ''}`} title={t === 'auto' ? 'Best way (auto)' : VEHICLE[t].label} onClick={() => { autoplay.current = true; setTravel(t); setMenuOpen(false); }}><span aria-hidden>{icon}</span><small>{text}</small></button>;
                 })}
               </div>
               <button role="menuitem" className="mf-opt is-primary" onClick={() => { setMenuOpen(false); (playing ? stop : play)(); }}>{playing ? '■ Stop journey' : '▶ Play journey'}</button>
