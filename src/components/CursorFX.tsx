@@ -81,7 +81,8 @@ export function CursorFX() {
       // Over a photo: the colour-inverting disc. Over links/buttons: a gold ring. Elsewhere: a small ring.
       const t = e.target as Element | null;
       // The 3D map keeps a plain small ring: an inverting lens over a live map just hides what you're looking at.
-      const next = t?.closest?.('.mapfly-map') ? ''
+      // The turning photo ring keeps the plain ring too: an inverting lens flashing on and off as cards pass looks like blinking.
+      const next = t?.closest?.('.mapfly-map, .ring-wrap') ? ''
         : t?.closest?.('img, video, .pg-item, .top-photo, .media, .hero-fit, .zoom-loop') ? 'img'
         : t?.closest?.('a, button, [role="button"], input, select, textarea, label') ? 'link' : '';
       if (next !== hover) {

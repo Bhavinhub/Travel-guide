@@ -724,7 +724,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           <button className="btn btn-sm btn-primary" onClick={playing ? stop : play}>{playing ? '■ Stop' : '▶ Play journey'}</button>
           <button className="btn btn-sm" onClick={toggleFree}>{free ? 'Back to journey' : 'Explore map'}</button>
           <button className="btn btn-sm" onClick={toggleFull} aria-pressed={full}>{full ? '✕ Exit full screen' : '⛶ Full screen'}</button>
-          <button className="btn btn-sm" onClick={saveOffline} disabled={saving !== null || !online} title="Download this journey's map so it works without internet">{saving !== null ? `Saving… ${Math.round(saving * 100)}%` : '⬇ Save offline'}</button>
+          <button className="btn btn-sm" onClick={saveOffline} disabled={saving !== null || !online} title="Download this journey's map so it works without internet">{saving !== null ? `Saving… ${Math.round(saving * 100)}%` : '↓ Save offline'}</button>
           <a className="btn btn-sm" href={from ? `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${lat},${lon}` : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`} target="_blank" rel="noreferrer">Directions ↗</a>
         </div>
         {!online && <p className="mapfly-offline small" role="status">Offline — showing the map saved on this device</p>}

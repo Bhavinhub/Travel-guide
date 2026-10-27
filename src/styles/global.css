@@ -1451,3 +1451,46 @@ html[data-theme='light'] body .nav-results, html[data-theme='light'] body:has(.p
   html body .marquee .moment { scroll-snap-align: center; flex: none; }
   html body .marquee .moment.is-dup { display: none; }
 }
+/* Photo ring: no pop-forward on hover (cards passing under a still cursor kept jumping — the "blinking");
+   a soft accent glow instead. Lighter shadows on touch screens. */
+html body .ring-card:hover { transform: none; box-shadow: 0 30px 50px -25px rgba(0,0,0,.8), 0 0 0 2px var(--pa); }
+html body .ring-card { transition: box-shadow .3s; }
+.ring-card img { background: linear-gradient(160deg, #1d2f3d, #0f1a22); }
+@media (hover: none), (pointer: coarse) { html body .ring-card { box-shadow: 0 10px 22px -12px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.14); } }
+
+/* ═══ Map: tidy "On the way" card and one consistent row of pill buttons (laptop and phone) ═══ */
+html body .mapfly .mapfly-card { transform: translateY(8px); display: grid; grid-template-columns: 120px 1fr; align-items: stretch; min-height: 96px;
+  border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,.16); box-shadow: 0 16px 36px -16px rgba(0,0,0,.75); }
+html body .mapfly .mapfly-card.is-on { transform: none; }
+html body .mapfly .mapfly-card img { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; display: block; border-radius: 0; }
+html body .mapfly .mapfly-card > div { display: flex; flex-direction: column; justify-content: center; gap: .2rem; padding: .7rem .9rem; min-width: 0; }
+html body .mapfly .mapfly-card b { font-size: 1rem; line-height: 1.25; }
+@media (max-width: 640px) {
+  html body .mapfly .mapfly-card { grid-template-columns: 92px 1fr; min-height: 84px; left: .6rem; right: .6rem; width: auto; }
+  html body .mapfly .mapfly-card > div { padding: .55rem .75rem; }
+}
+/* Satellite | Map: one pill, same height and look as the other buttons, active half in gold. */
+html body .mapfly .mapfly-ui .seg { display: inline-flex; align-items: stretch; padding: 3px; gap: 2px; border-radius: 999px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.22); background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(10,22,30,.55);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 18px -10px rgba(0,0,0,.6); min-height: 36px; box-sizing: border-box; }
+html body .mapfly .mapfly-ui .seg button { all: unset; cursor: pointer; display: inline-flex; align-items: center; padding: 0 .9rem; border-radius: 999px; font-size: .85rem; font-weight: 600; color: var(--glacier-dim, #c9d6dc); }
+html body .mapfly .mapfly-ui .seg button[aria-pressed='true'] { background: linear-gradient(160deg, #ffe2a8, #f4b860); color: #10202a; box-shadow: inset 0 1px 0 rgba(255,255,255,.7); }
+html[data-theme='light'] body .mapfly .mapfly-ui .seg { background: linear-gradient(160deg, #fff, #eef3f6); border-color: rgba(13,42,34,.15); }
+html[data-theme='light'] body .mapfly .mapfly-ui .seg button { color: #2b3f4b; }
+html body .mapfly .mapfly-ui { align-items: center; }
+html body .mapfly .mapfly-ui > .btn, html body .mapfly .mapfly-ui > a.btn { min-height: 36px; display: inline-flex; align-items: center; }
+@media (max-width: 640px) {
+  html body .mapfly .mapfly-ui .seg { min-height: 34px; }
+  html body .mapfly .mapfly-ui .seg button { padding: 0 .7rem; font-size: .78rem; }
+}
+/* Taps register instantly on phones (no double-tap-zoom wait), and the header controls are finger-sized and on top. */
+a, button, [role='button'], input, select, label, summary { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+html body header.nav { z-index: 1000; }
+html body .drawer { z-index: 1100; }
+@media (hover: none), (pointer: coarse) { html body .nav .menu-btn { width: 44px; height: 44px; } html body .nav .theme-toggle { min-height: 44px; } }
+/* The stop card sits on the map: always a dark card with light text, in both themes. */
+html body .mapfly .mapfly-card, html[data-theme='light'] body .mapfly .mapfly-card, html[data-theme='light'] body:has(.page-dolly) .mapfly .mapfly-card.glass { background: rgba(8, 18, 24, .9) !important; color: #fff; }
+html[data-theme='light'] body .mapfly .mapfly-card .muted, html[data-theme='light'] body .mapfly .mapfly-card .tiny { color: #cfdcd6; }
+/* Notices sit under the route label, never on top of the stop card or the buttons. */
+html body .mapfly .mapfly-offline { top: 6.4rem; bottom: auto; }
+@media (max-width: 640px) { html body .mapfly .mapfly-offline { top: 9.6rem; white-space: normal; text-align: center; } }

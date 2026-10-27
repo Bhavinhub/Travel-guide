@@ -11,6 +11,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ATaj_Mahal%2C_Agra%2C_India_edit2.jpg",
     "sizes": {
+     "480": "/media/ch-forest/0-480.jpg",
      "960": "/media/ch-forest/0-960.jpg",
      "1920": "/media/ch-forest/0-1920.jpg",
      "3840": "/media/ch-forest/0-3840.jpg"
@@ -30,6 +31,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AMangrove_Arch_Boat_Ashtamudi_Kollam_Kerala_Mar22_A7C_01490.jpg",
     "sizes": {
+     "480": "/media/ch-rainforest/0-480.jpg",
      "960": "/media/ch-rainforest/0-960.jpg",
      "1920": "/media/ch-rainforest/0-1920.jpg",
      "3840": "/media/ch-rainforest/0-3840.jpg"
@@ -49,6 +51,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AView_of_Indus_Valley_from_Thikse_Gompa%2C_Ladakh%2C_India.jpg",
     "sizes": {
+     "480": "/media/ch-valley/0-480.jpg",
      "960": "/media/ch-valley/0-960.jpg",
      "1920": "/media/ch-valley/0-1920.jpg",
      "3840": "/media/ch-valley/0-3840.jpg"
@@ -68,6 +71,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AGurudongmar_Lake_Sikkim%2C_India_(edit).jpg",
     "sizes": {
+     "480": "/media/ch-snow/0-480.jpg",
      "960": "/media/ch-snow/0-960.jpg",
      "1920": "/media/ch-snow/0-1920.jpg",
      "3840": "/media/ch-snow/0-3840.jpg"
@@ -87,6 +91,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADiamonds_Thudufushi_Beach_and_Water_Villas%2C_May_2017_-03.jpg",
     "sizes": {
+     "480": "/media/ch-beach/0-480.jpg",
      "960": "/media/ch-beach/0-960.jpg",
      "1920": "/media/ch-beach/0-1920.jpg",
      "3840": "/media/ch-beach/0-3840.jpg"
@@ -106,6 +111,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ASkylines_of_the_Central_Business_District%2C_Singapore_at_dusk.jpg",
     "sizes": {
+     "480": "/media/ch-city/0-480.jpg",
      "960": "/media/ch-city/0-960.jpg",
      "1920": "/media/ch-city/0-1920.jpg",
      "3840": "/media/ch-city/0-3840.jpg"
@@ -185,6 +191,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AValley_of_flowers_national_park%2C_Uttarakhand%2C_India_03_(edit).jpg",
     "sizes": {
+     "480": "/media/ch-discover/0-480.jpg",
      "960": "/media/ch-discover/0-960.jpg",
      "1920": "/media/ch-discover/0-1920.jpg",
      "3840": "/media/ch-discover/0-3840.jpg"
@@ -205,6 +212,7 @@
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0",
     "source": "https://commons.wikimedia.org/wiki/File:HOLI_FESTIVAL_IN_INDIA_04.jpg",
     "sizes": {
+     "480": "/media/m-holi/h-480.jpg",
      "960": "/media/m-holi/h-960.jpg",
      "1920": "/media/m-holi/h-1920.jpg"
     }
@@ -224,6 +232,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AElephas_maximus_(Bandipur).jpg",
     "sizes": {
+     "480": "/media/m-elephant/0-480.jpg",
      "960": "/media/m-elephant/0-960.jpg",
      "1920": "/media/m-elephant/0-1920.jpg"
     }
@@ -243,6 +252,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ABengal_tiger_in_Sanjay_Dubri_Tiger_Reserve_December_2024_by_Tisha_Mukherjee_11.jpg",
     "sizes": {
+     "480": "/media/m-tiger/0-480.jpg",
      "960": "/media/m-tiger/0-960.jpg",
      "1920": "/media/m-tiger/0-1920.jpg",
      "3840": "/media/m-tiger/0-3840.jpg"
@@ -263,6 +273,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ANilgiri_Tahr_at_Eravikulam_National_Park.jpg",
     "sizes": {
+     "480": "/media/m-tahr/0-480.jpg",
      "960": "/media/m-tahr/0-960.jpg",
      "1920": "/media/m-tahr/0-1920.jpg",
      "3840": "/media/m-tahr/0-3840.jpg"
@@ -283,6 +294,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AIndian_Peafowl_or_Peahen.jpg",
     "sizes": {
+     "480": "/media/m-peafowl/0-480.jpg",
      "960": "/media/m-peafowl/0-960.jpg",
      "1920": "/media/m-peafowl/0-1920.jpg",
      "3840": "/media/m-peafowl/0-3840.jpg"
@@ -303,6 +315,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AKottappuram-nileshwaram-house-boat.jpg",
     "sizes": {
+     "480": "/media/m-backwaters/0-480.jpg",
      "960": "/media/m-backwaters/0-960.jpg",
      "1920": "/media/m-backwaters/0-1920.jpg",
      "3840": "/media/m-backwaters/0-3840.jpg"
@@ -323,6 +336,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AShibuya_Crossing%2C_Aerial.jpg",
     "sizes": {
+     "480": "/media/m-shibuya/0-480.jpg",
      "960": "/media/m-shibuya/0-960.jpg",
      "1920": "/media/m-shibuya/0-1920.jpg",
      "3840": "/media/m-shibuya/0-3840.jpg"
@@ -343,6 +357,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ANew_york_times_square-terabass.jpg",
     "sizes": {
+     "480": "/media/m-timessq/0-480.jpg",
      "960": "/media/m-timessq/0-960.jpg",
      "1920": "/media/m-timessq/0-1920.jpg",
      "3840": "/media/m-timessq/0-3840.jpg"
@@ -363,6 +378,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADarjeeling%2C_India%2C_Darjeeling_tea_in_variety%2C_Black_tea.jpg",
     "sizes": {
+     "480": "/media/m-tea/0-480.jpg",
      "960": "/media/m-tea/0-960.jpg",
      "1920": "/media/m-tea/0-1920.jpg",
      "3840": "/media/m-tea/0-3840.jpg"
@@ -382,6 +398,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AView_from_Visvesvaraya_Industrial_and_Technological_Museum_(2025)_02.jpg",
     "sizes": {
+     "480": "/media/bengaluru/0-480.jpg",
      "960": "/media/bengaluru/0-960.jpg",
      "1920": "/media/bengaluru/0-1920.jpg",
      "3840": "/media/bengaluru/0-3840.jpg"
@@ -441,6 +458,7 @@
     "licenseUrl": "http://www.gnu.org/licenses/old-licenses/fdl-1.2.html",
     "source": "https://commons.wikimedia.org/wiki/File%3AMysore_Palace_Morning.jpg",
     "sizes": {
+     "480": "/media/mysuru/0-480.jpg",
      "960": "/media/mysuru/0-960.jpg",
      "1920": "/media/mysuru/0-1920.jpg",
      "3840": "/media/mysuru/0-3840.jpg"
@@ -501,6 +519,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ATadiandamol_Valley%2C_Western_Ghats.jpg",
     "sizes": {
+     "480": "/media/coorg/0-480.jpg",
      "960": "/media/coorg/0-960.jpg",
      "1920": "/media/coorg/0-1920.jpg",
      "3840": "/media/coorg/0-3840.jpg"
@@ -562,6 +581,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AChikmagalur%2C_India._(7793316622).jpg",
     "sizes": {
+     "480": "/media/chikkamagaluru/0-480.jpg",
      "960": "/media/chikkamagaluru/0-960.jpg",
      "1920": "/media/chikkamagaluru/0-1920.jpg"
     }
@@ -580,6 +600,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AOoty_lake.jpg",
     "sizes": {
+     "480": "/media/ooty/0-480.jpg",
      "960": "/media/ooty/0-960.jpg",
      "1920": "/media/ooty/0-1920.jpg"
     }
@@ -639,6 +660,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AMunnar_Overview.jpg",
     "sizes": {
+     "480": "/media/munnar/0-480.jpg",
      "960": "/media/munnar/0-960.jpg",
      "1920": "/media/munnar/0-1920.jpg",
      "3840": "/media/munnar/0-3840.jpg"
@@ -697,6 +719,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AKottappuram-nileshwaram-house-boat.jpg",
     "sizes": {
+     "480": "/media/alleppey/0-480.jpg",
      "960": "/media/alleppey/0-960.jpg",
      "1920": "/media/alleppey/0-1920.jpg",
      "3840": "/media/alleppey/0-3840.jpg"
@@ -755,6 +778,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AFront_Elevation_of_Basilica_of_Bom_Jesus.jpg",
     "sizes": {
+     "480": "/media/goa/0-480.jpg",
      "960": "/media/goa/0-960.jpg",
      "1920": "/media/goa/0-1920.jpg",
      "3840": "/media/goa/0-3840.jpg"
@@ -816,6 +840,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AGateway_of_India_Beautiful.jpg",
     "sizes": {
+     "480": "/media/mumbai/1-480.jpg",
      "960": "/media/mumbai/1-960.jpg",
      "1920": "/media/mumbai/1-1920.jpg",
      "3840": "/media/mumbai/1-3840.jpg"
@@ -923,6 +948,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ATrayambakeshwar_Temple_VK.jpg",
     "sizes": {
+     "480": "/media/rishikesh/0-480.jpg",
      "960": "/media/rishikesh/0-960.jpg",
      "1920": "/media/rishikesh/0-1920.jpg",
      "3840": "/media/rishikesh/0-3840.jpg"
@@ -984,6 +1010,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AManali_City.jpg",
     "sizes": {
+     "480": "/media/manali/0-480.jpg",
      "960": "/media/manali/0-960.jpg",
      "1920": "/media/manali/0-1920.jpg"
     }
@@ -1043,6 +1070,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ALandscape_of_Shimla_%2C_Himachal_Pradesh.jpg",
     "sizes": {
+     "480": "/media/shimla/0-480.jpg",
      "960": "/media/shimla/0-960.jpg",
      "1920": "/media/shimla/0-1920.jpg",
      "3840": "/media/shimla/0-3840.jpg"
@@ -1102,6 +1130,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADal_Lake_Hazratbal_Srinagar.jpg",
     "sizes": {
+     "480": "/media/srinagar/0-480.jpg",
      "960": "/media/srinagar/0-960.jpg",
      "1920": "/media/srinagar/0-1920.jpg",
      "3840": "/media/srinagar/0-3840.jpg"
@@ -1161,6 +1190,7 @@
     "license": "Public domain",
     "source": "https://commons.wikimedia.org/wiki/File%3AISS054-E-7809_-_View_of_Earth_(cropped).jpg",
     "sizes": {
+     "480": "/media/leh/0-480.jpg",
      "960": "/media/leh/0-960.jpg",
      "1920": "/media/leh/0-1920.jpg",
      "3840": "/media/leh/0-3840.jpg"
@@ -1194,6 +1224,7 @@
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
     "source": "https://commons.wikimedia.org/wiki/File%3AKangch-Goechala.jpg",
     "sizes": {
+     "480": "/media/gangtok/0-480.jpg",
      "960": "/media/gangtok/0-960.jpg",
      "1920": "/media/gangtok/0-1920.jpg"
     }
@@ -1361,6 +1392,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3APondicherry-Rock_beach_aerial_view.jpg",
     "sizes": {
+     "480": "/media/pondicherry/0-480.jpg",
      "960": "/media/pondicherry/0-960.jpg",
      "1920": "/media/pondicherry/0-1920.jpg",
      "3840": "/media/pondicherry/0-3840.jpg"
@@ -1420,6 +1452,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ACorbyns_cove_beach%2CPort_Blaire%2CAndaman_-_panoramio.jpg",
     "sizes": {
+     "480": "/media/port-blair/0-480.jpg",
      "960": "/media/port-blair/0-960.jpg",
      "1920": "/media/port-blair/0-1920.jpg",
      "3840": "/media/port-blair/0-3840.jpg"
@@ -1478,6 +1511,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AHavelock%2C_Andaman_%26_Nicobar_Islands.JPG",
     "sizes": {
+     "480": "/media/havelock/0-480.jpg",
      "960": "/media/havelock/0-960.jpg",
      "1920": "/media/havelock/0-1920.jpg",
      "3840": "/media/havelock/0-3840.jpg"
@@ -1539,6 +1573,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AKeshet_neal_island_india.jpg",
     "sizes": {
+     "480": "/media/neil-island/0-480.jpg",
      "960": "/media/neil-island/0-960.jpg",
      "1920": "/media/neil-island/0-1920.jpg"
     }
@@ -1599,6 +1634,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ASunrise_at_Nandi_Hills.jpg",
     "sizes": {
+     "480": "/media/nandi-hills/0-480.jpg",
      "960": "/media/nandi-hills/0-960.jpg",
      "1920": "/media/nandi-hills/0-1920.jpg",
      "3840": "/media/nandi-hills/0-3840.jpg"
@@ -1660,6 +1696,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AWide_angle_of_Galigopuram_of_Virupaksha_Temple%2C_Hampi_(04)_(cropped).jpg",
     "sizes": {
+     "480": "/media/hampi/0-480.jpg",
      "960": "/media/hampi/0-960.jpg",
      "1920": "/media/hampi/0-1920.jpg",
      "3840": "/media/hampi/0-3840.jpg"
@@ -1721,6 +1758,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ABlue%2C_Green_%26_White.jpg",
     "sizes": {
+     "480": "/media/wayanad/0-480.jpg",
      "960": "/media/wayanad/0-960.jpg",
      "1920": "/media/wayanad/0-1920.jpg",
      "3840": "/media/wayanad/0-3840.jpg"
@@ -1780,6 +1818,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ABoating_in_Kodaikanal_Lake_with_Mist.jpg",
     "sizes": {
+     "480": "/media/kodaikanal/0-480.jpg",
      "960": "/media/kodaikanal/0-960.jpg",
      "1920": "/media/kodaikanal/0-1920.jpg",
      "3840": "/media/kodaikanal/0-3840.jpg"
@@ -1839,6 +1878,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3APancha_Ratha_Panorama_(1).jpg",
     "sizes": {
+     "480": "/media/mahabalipuram/0-480.jpg",
      "960": "/media/mahabalipuram/0-960.jpg",
      "1920": "/media/mahabalipuram/0-1920.jpg",
      "3840": "/media/mahabalipuram/0-3840.jpg"
@@ -1899,6 +1939,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AIndia_Gate_from_Rajpath.jpg",
     "sizes": {
+     "480": "/media/delhi/0-480.jpg",
      "960": "/media/delhi/0-960.jpg",
      "1920": "/media/delhi/0-1920.jpg"
     }
@@ -1957,6 +1998,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADasaswamedh_ghat-varanasi_india-andres_larin.jpg",
     "sizes": {
+     "480": "/media/m-aarti/0-480.jpg",
      "960": "/media/m-aarti/0-960.jpg",
      "1920": "/media/m-aarti/0-1920.jpg",
      "3840": "/media/m-aarti/0-3840.jpg"
@@ -1976,6 +2018,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ATaj_Mahal_(Edited).jpeg",
     "sizes": {
+     "480": "/media/agra/0-480.jpg",
      "960": "/media/agra/0-960.jpg",
      "1920": "/media/agra/0-1920.jpg",
      "3840": "/media/agra/0-3840.jpg"
@@ -2034,6 +2077,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ANainital_metro.jpg",
     "sizes": {
+     "480": "/media/nainital/0-480.jpg",
      "960": "/media/nainital/0-960.jpg",
      "1920": "/media/nainital/0-1920.jpg",
      "3840": "/media/nainital/0-3840.jpg"
@@ -2080,6 +2124,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AKedarnath_Temple_in_Rainy_season.jpg",
     "sizes": {
+     "480": "/media/kedarnath/0-480.jpg",
      "960": "/media/kedarnath/0-960.jpg",
      "1920": "/media/kedarnath/0-1920.jpg",
      "3840": "/media/kedarnath/0-3840.jpg"
@@ -2111,6 +2156,7 @@
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     "source": "https://commons.wikimedia.org/wiki/File%3ATiger_Valley_Bridge_view_3.jpg",
     "sizes": {
+     "480": "/media/lonavala/0-480.jpg",
      "960": "/media/lonavala/0-960.jpg",
      "1920": "/media/lonavala/0-1920.jpg",
      "3840": "/media/lonavala/0-3840.jpg"
@@ -2172,6 +2218,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AMAHABALESWAR_LANDSCAPE.jpg",
     "sizes": {
+     "480": "/media/mahabaleshwar/0-480.jpg",
      "960": "/media/mahabaleshwar/0-960.jpg",
      "1920": "/media/mahabaleshwar/0-1920.jpg",
      "3840": "/media/mahabaleshwar/0-3840.jpg"
@@ -2219,6 +2266,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AKanhoji_Angre_Samadhi_-_%E0%A4%95%E0%A4%BE%E0%A4%A8%E0%A5%8D%E0%A4%B9%E0%A5%8B%E0%A4%9C%E0%A5%80_%E0%A4%86%E0%A4%82%E0%A4%97%E0%A5%8D%E0%A4%B0%E0%A5%87_%E0%A4%B8%E0%A4%AE%E0%A4%BE%E0%A4%A7%E0%A5%80_1.JPG",
     "sizes": {
+     "480": "/media/alibaug/0-480.jpg",
      "960": "/media/alibaug/0-960.jpg",
      "1920": "/media/alibaug/0-1920.jpg",
      "3840": "/media/alibaug/0-3840.jpg"
@@ -2252,6 +2300,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AEntire_mussorie.jpg",
     "sizes": {
+     "480": "/media/mussoorie/0-480.jpg",
      "960": "/media/mussoorie/0-960.jpg",
      "1920": "/media/mussoorie/0-1920.jpg",
      "3840": "/media/mussoorie/0-3840.jpg"
@@ -2355,6 +2404,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3APhuket_Aerial.jpg",
     "sizes": {
+     "480": "/media/phuket/0-480.jpg",
      "960": "/media/phuket/0-960.jpg",
      "1920": "/media/phuket/0-1920.jpg",
      "3840": "/media/phuket/0-3840.jpg"
@@ -2416,6 +2466,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3A0020-%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%9E%E0%B8%A3%E0%B8%B0%E0%B8%AA%E0%B8%B4%E0%B8%87%E0%B8%AB%E0%B9%8C%E0%B8%A7%E0%B8%A3%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%AB%E0%B8%B2%E0%B8%A3.jpg",
     "sizes": {
+     "480": "/media/chiang-mai/0-480.jpg",
      "960": "/media/chiang-mai/0-960.jpg",
      "1920": "/media/chiang-mai/0-1920.jpg",
      "3840": "/media/chiang-mai/0-3840.jpg"
@@ -2539,6 +2590,7 @@
     "licenseUrl": "https://unsplash.com/license",
     "source": "https://unsplash.com/photos/N1GAuG_VLjg",
     "sizes": {
+     "480": "/media/u-kedarnath/0-480.jpg",
      "960": "/media/u-kedarnath/0-960.jpg",
      "1920": "/media/u-kedarnath/0-1920.jpg",
      "3840": "/media/u-kedarnath/0-3840.jpg"
@@ -2580,6 +2632,7 @@
     "licenseUrl": "https://unsplash.com/license",
     "source": "https://unsplash.com/photos/ii0oWs5abCo",
     "sizes": {
+     "480": "/media/u-kerala/0-480.jpg",
      "960": "/media/u-kerala/0-960.jpg",
      "1920": "/media/u-kerala/0-1920.jpg",
      "3840": "/media/u-kerala/0-3840.jpg"
@@ -2600,6 +2653,7 @@
     "licenseUrl": "https://unsplash.com/license",
     "source": "https://unsplash.com/photos/wLaYEB2GZmQ",
     "sizes": {
+     "480": "/media/u-pangong/0-480.jpg",
      "960": "/media/u-pangong/0-960.jpg",
      "1920": "/media/u-pangong/0-1920.jpg",
      "3840": "/media/u-pangong/0-3840.jpg"
@@ -2620,6 +2674,7 @@
     "licenseUrl": "https://unsplash.com/license",
     "source": "https://unsplash.com/photos/kjicxykvfiA",
     "sizes": {
+     "480": "/media/u-maldives/0-480.jpg",
      "960": "/media/u-maldives/0-960.jpg",
      "1920": "/media/u-maldives/0-1920.jpg",
      "3840": "/media/u-maldives/0-3840.jpg"
@@ -2640,6 +2695,7 @@
     "licenseUrl": "https://unsplash.com/license",
     "source": "https://unsplash.com/photos/5fcu9ckA78Y",
     "sizes": {
+     "480": "/media/u-mumbai/0-480.jpg",
      "960": "/media/u-mumbai/0-960.jpg",
      "1920": "/media/u-mumbai/0-1920.jpg",
      "3840": "/media/u-mumbai/0-3840.jpg"
@@ -2843,6 +2899,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AWelcome_to_Maafushi-Maldives-Andres_Larin.jpg",
     "sizes": {
+     "480": "/media/maafushi/0-480.jpg",
      "960": "/media/maafushi/0-960.jpg",
      "1920": "/media/maafushi/0-1920.jpg",
      "3840": "/media/maafushi/0-3840.jpg"
@@ -2904,6 +2961,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3APanaji_City.JPG",
     "sizes": {
+     "480": "/media/n-goa-panjim/0-480.jpg",
      "960": "/media/n-goa-panjim/0-960.jpg",
      "1920": "/media/n-goa-panjim/0-1920.jpg"
     }
@@ -2922,6 +2980,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AFeroze_Shah's_Tomb.JPG",
     "sizes": {
+     "480": "/media/n-del-hkv/0-480.jpg",
      "960": "/media/n-del-hkv/0-960.jpg",
      "1920": "/media/n-del-hkv/0-1920.jpg"
     }
@@ -2940,6 +2999,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ASkyline_at_Rajiv_Chowk.JPG",
     "sizes": {
+     "480": "/media/n-del-cp/0-480.jpg",
      "960": "/media/n-del-cp/0-960.jpg",
      "1920": "/media/n-del-cp/0-1920.jpg"
     }
@@ -2958,6 +3018,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3A2016_Bangkok%2C_Dystrykt_Phra_Nakhon%2C_Ulica_Khaosan_(08).jpg",
     "sizes": {
+     "480": "/media/n-bkk-khaosan/0-480.jpg",
      "960": "/media/n-bkk-khaosan/0-960.jpg",
      "1920": "/media/n-bkk-khaosan/0-1920.jpg",
      "3840": "/media/n-bkk-khaosan/0-3840.jpg"
@@ -2976,6 +3037,7 @@
     "license": "Public domain",
     "source": "https://commons.wikimedia.org/wiki/File%3ABangla_Road_Patong_Thajsko_2018_5.jpg",
     "sizes": {
+     "480": "/media/n-hkt-patong/0-480.jpg",
      "960": "/media/n-hkt-patong/0-960.jpg",
      "1920": "/media/n-hkt-patong/0-1920.jpg"
     }
@@ -2994,6 +3056,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ADubai_Marina_Skyline.jpg",
     "sizes": {
+     "480": "/media/n-dxb-marina/0-480.jpg",
      "960": "/media/n-dxb-marina/0-960.jpg",
      "1920": "/media/n-dxb-marina/0-1920.jpg",
      "3840": "/media/n-dxb-marina/0-3840.jpg"
@@ -3013,6 +3076,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File%3A1_clarke_quay_singapore_night_2014.jpg",
     "sizes": {
+     "480": "/media/n-sin-clarke/0-480.jpg",
      "960": "/media/n-sin-clarke/0-960.jpg",
      "1920": "/media/n-sin-clarke/0-1920.jpg",
      "3840": "/media/n-sin-clarke/0-3840.jpg"
@@ -3032,6 +3096,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AG2_Street_20090626_2.jpg",
     "sizes": {
+     "480": "/media/n-tyo-golden-gai/0-480.jpg",
      "960": "/media/n-tyo-golden-gai/0-960.jpg",
      "1920": "/media/n-tyo-golden-gai/0-1920.jpg"
     }
@@ -3050,6 +3115,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AShibuya_skyline_from_Tokyu_Plaza_in_Omotesando%2C_Harajuku%2C_Tokyo%2C_2024_May.jpg",
     "sizes": {
+     "480": "/media/n-tyo-shibuya/0-480.jpg",
      "960": "/media/n-tyo-shibuya/0-960.jpg",
      "1920": "/media/n-tyo-shibuya/0-1920.jpg",
      "3840": "/media/n-tyo-shibuya/0-3840.jpg"
@@ -3069,6 +3135,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ACafe_Boheme%2C_Soho%2C_W1.jpg",
     "sizes": {
+     "480": "/media/n-lon-soho/0-480.jpg",
      "960": "/media/n-lon-soho/0-960.jpg",
      "1920": "/media/n-lon-soho/0-1920.jpg"
     }
@@ -3087,6 +3154,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AView_from_Curtain_Road%2C_Shoreditch.jpg",
     "sizes": {
+     "480": "/media/n-lon-shoreditch/0-480.jpg",
      "960": "/media/n-lon-shoreditch/0-960.jpg",
      "1920": "/media/n-lon-shoreditch/0-1920.jpg",
      "3840": "/media/n-lon-shoreditch/0-3840.jpg"
@@ -3105,6 +3173,7 @@
     "license": "Public domain",
     "source": "https://commons.wikimedia.org/wiki/File%3ANYC1776_labelled.jpg",
     "sizes": {
+     "480": "/media/n-nyc-les/0-480.jpg",
      "960": "/media/n-nyc-les/0-960.jpg",
      "1920": "/media/n-nyc-les/0-1920.jpg",
      "3840": "/media/n-nyc-les/0-3840.jpg"
@@ -3124,6 +3193,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AGreenwich_Village_(27483343909).jpg",
     "sizes": {
+     "480": "/media/n-nyc-village/0-480.jpg",
      "960": "/media/n-nyc-village/0-960.jpg",
      "1920": "/media/n-nyc-village/0-1920.jpg",
      "3840": "/media/n-nyc-village/0-3840.jpg"
@@ -3143,6 +3213,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ABaa_atoll_islands.JPG",
     "sizes": {
+     "480": "/media/baa-atoll/0-480.jpg",
      "960": "/media/baa-atoll/0-960.jpg",
      "1920": "/media/baa-atoll/0-1920.jpg",
      "3840": "/media/baa-atoll/0-3840.jpg"
@@ -3506,6 +3577,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AHollywood_sign_(8485145044).jpg",
     "sizes": {
+     "480": "/media/los-angeles/0-480.jpg",
      "960": "/media/los-angeles/0-960.jpg",
      "1920": "/media/los-angeles/0-1920.jpg",
      "3840": "/media/los-angeles/0-3840.jpg"
@@ -3569,6 +3641,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AUB_City_at_night_.jpg",
     "sizes": {
+     "480": "/media/n-blr-mg-road/0-480.jpg",
      "960": "/media/n-blr-mg-road/0-960.jpg",
      "1920": "/media/n-blr-mg-road/0-1920.jpg",
      "3840": "/media/n-blr-mg-road/0-3840.jpg"
@@ -3588,6 +3661,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ACoastal_Road%2C_Mumbai%2C_November_2025_(cropped).jpg",
     "sizes": {
+     "480": "/media/n-bom-lower-parel/0-480.jpg",
      "960": "/media/n-bom-lower-parel/0-960.jpg",
      "1920": "/media/n-bom-lower-parel/0-1920.jpg"
     }
@@ -3606,6 +3680,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
     "source": "https://commons.wikimedia.org/wiki/File%3ABandra_Worli_Sea_Link_at_night.jpg",
     "sizes": {
+     "480": "/media/n-bom-bandra/0-480.jpg",
      "960": "/media/n-bom-bandra/0-960.jpg",
      "1920": "/media/n-bom-bandra/0-1920.jpg"
     }
@@ -3624,6 +3699,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File%3AAnjuna_Beach%2C_Goa%2C_India%2C_Legendary_Curlies_beach_shack.jpg",
     "sizes": {
+     "480": "/media/n-goa-north/0-480.jpg",
      "960": "/media/n-goa-north/0-960.jpg",
      "1920": "/media/n-goa-north/0-1920.jpg",
      "3840": "/media/n-goa-north/0-3840.jpg"
@@ -3704,6 +3780,7 @@
     "licenseUrl": "",
     "source": "https://travelguide-world.netlify.app/#/about",
     "sizes": {
+     "480": "/media/kedarnath-day/0-480.jpg",
      "960": "/media/kedarnath-day/0-960.jpg",
      "1920": "/media/kedarnath-day/0-full.jpg"
     }
@@ -3723,6 +3800,7 @@
     "licenseUrl": "",
     "source": "https://travelguide-world.netlify.app/#/about",
     "sizes": {
+     "480": "/media/badrinath-day/0-480.jpg",
      "960": "/media/badrinath-day/0-960.jpg",
      "1920": "/media/badrinath-day/0-full.jpg"
     }
@@ -3760,6 +3838,7 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Golden_Temple,_Amritsar_01.jpg",
     "sizes": {
+     "480": "/media/golden-temple/0-480.jpg",
      "960": "/media/golden-temple/0-960.jpg",
      "1920": "/media/golden-temple/0-1920.jpg",
      "3840": "/media/golden-temple/0-3840.jpg"

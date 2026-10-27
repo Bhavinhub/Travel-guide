@@ -132,6 +132,15 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
   const over = useRef(false);
   const overCard = useRef(false);
   const dragMoved = useRef(0);
+  const mouseOpened = useRef(false);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: '1200px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const n = items.length;
   const cardW = 230;
   const radius = Math.round(cardW / 2 / Math.tan(Math.PI / n) + 60);
@@ -177,7 +186,8 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
         if (visible) raf = requestAnimationFrame(tick);
         return;
       }
-      const goal = over.current ? target : 6; // the calm zone in the middle is what stops it for clicking
+      // Reduced motion: no automatic spin — the ring only turns when swiped.
+      const goal = !motion ? 0 : over.current ? target : 6; // the calm zone in the middle is what stops it for clicking
       if (over.current && Math.abs(target) < 0.5 && Math.abs(speed) < 4) {
         // Resting in the calm zone: settle so a card faces you squarely (never a gap in the middle).
         const step = 360 / n, nearest = Math.round(a / step) * step;
@@ -188,20 +198,20 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
         a += speed * dt;
       }
       if (ring.current) ring.current.style.transform = `translateZ(${-radius}px) rotateY(${-a}deg)`;
-      if (visible) raf = requestAnimationFrame(tick);
+      if (visible && (motion || Math.abs(speed) > 0.05)) raf = requestAnimationFrame(tick); // idle when a still ring has nothing to do
     };
     // Animate only while the ring is on screen.
     const io = new IntersectionObserver(([e]) => {
       visible = e.isIntersecting;
-      if (visible && motion && !raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
+      if (visible && !raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
     }, { rootMargin: '100px 0px' });
+    if (wrap.current) io.observe(wrap.current);
+    if (!motion) speed = 0;
     el?.addEventListener('pointerdown', onDown, { passive: true });
     el?.addEventListener('pointermove', onDrag, { passive: true });
     addEventListener('pointerup', onUp); addEventListener('pointercancel', onUp);
-    if (motion) {
-      if (wrap.current) io.observe(wrap.current);
-      addEventListener('pointermove', onMove, { passive: true });
-    } else if (ring.current) ring.current.style.transform = `translateZ(${-radius}px)`;
+    if (motion) addEventListener('pointermove', onMove, { passive: true });
+    else if (ring.current) ring.current.style.transform = `translateZ(${-radius}px)`;
     return () => {
       cancelAnimationFrame(raf);
       io.disconnect();
@@ -223,9 +233,9 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
                   onPointerEnter={() => { overCard.current = true; }} onPointerLeave={() => { overCard.current = false; }}
                   onFocus={() => { overCard.current = true; }} onBlur={() => { overCard.current = false; }}
                   // Mouse: open on release, even if the ring nudged the card a little while pressing.
-                  onPointerUp={(e) => { if (e.pointerType !== 'touch' && e.button === 0) onOpen(d, e); }}
-                  onClick={(e) => { if (e.detail === 0 || (e.nativeEvent as PointerEvent).pointerType === 'touch') onOpen(d, e); }}>
-                  {img ? <img src={srcOf(img, 'card')} alt="" loading="lazy" draggable={false} /> : <span className="photo-missing" />}
+                  onPointerUp={(e) => { if (e.pointerType === 'mouse' && e.button === 0) { mouseOpened.current = true; onOpen(d, e); } }}
+                  onClick={(e) => { if (mouseOpened.current) { mouseOpened.current = false; return; } onOpen(d, e); }}>
+                  {img ? <img src={near ? srcOf(img, 'thumb') : undefined} srcSet={near && img.sizes['480'] ? `${srcOf(img, 'thumb')} 480w, ${srcOf(img, 'card')} 960w` : undefined} sizes="460px" alt="" decoding="async" draggable={false} /> : <span className="photo-missing" />}
                   <span className="ring-meta"><b>{d.name}</b><small>{subtitle(d)}</small></span>
                 </button>
               </div>

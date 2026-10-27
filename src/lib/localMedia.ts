@@ -30,8 +30,9 @@ export function localImages(id: string) {
 }
 
 /** srcset helpers: card (960), large (1920), hero (3840 / 4K when the original allows). */
-export function srcOf(img: LocalImage, want: 'card' | 'large' | 'hero') {
+export function srcOf(img: LocalImage, want: 'thumb' | 'card' | 'large' | 'hero') {
   const s = img.sizes;
+  if (want === 'thumb') return url(s['480'] ?? s['960']);
   if (want === 'card') return url(s['960']);
   if (want === 'large') return url(s['1920'] ?? s['960']);
   return url(s['3840'] ?? s['1920'] ?? s['960']);
