@@ -13,7 +13,8 @@ import { Illustration } from '../components/Illustration';
 import { estimateTrip } from '../lib/estimate';
 import { generateItinerary, priceLevel } from '../lib/itinerary';
 import { useMedia, type MediaImage, type MediaSet } from '../lib/media';
-import { localImages, srcOf } from '../lib/localMedia';
+import { localImages, srcOf, srcSet } from '../lib/localMedia';
+import { HeroImage } from '../components/HeroImage';
 import { href, navigate } from '../lib/router';
 import { useMoney, useStore } from '../lib/store';
 import { defaultConfig } from '../lib/trip';
@@ -143,7 +144,7 @@ export default function DestinationPage({ id }: { id: string }) {
       <div className="page-bg" />
       <section className="dhero">
         <div className="bg">
-          {m.lead ? <img src={m.lead.srcLarge} alt={`${d.name} — lead photograph`} /> : m.status === 'loading' ? <div className="skeleton" style={{ position: 'absolute', inset: 0 }} /> : <Illustration scene={d.scene} accent={d.accent} />}
+          {local[0] ? <HeroImage src={srcOf(local[0], 'hero')!} srcSet={srcSet(local[0])} w={local[0].width} h={local[0].height} alt={`${d.name} — lead photograph`} /> : m.lead ? <HeroImage src={m.lead.srcLarge} alt={`${d.name} — lead photograph`} /> : m.status === 'loading' ? <div className="skeleton" style={{ position: 'absolute', inset: 0 }} /> : <Illustration scene={d.scene} accent={d.accent} />}
         </div>
         <div className="wrap">
           <ol className="crumbs" aria-label="Breadcrumb">

@@ -52,46 +52,6 @@ const BEST_INDIA = ['agra', 'udaipur', 'jaipur', 'kedarnath', 'munnar', 'goa', '
 const BEST_WORLD = ['bali', 'male', 'paris', 'singapore', 'bangkok', 'dubai', 'tokyo', 'interlaken', 'new-york', 'phuket', 'london', 'kyoto'];
 const MOMENTS = ['m-holi', 'm-aarti', 'm-elephant', 'm-tiger', 'm-tahr', 'm-peafowl', 'm-backwaters', 'm-tea', 'm-shibuya', 'm-timessq', 'n-bom-bandra', 'n-sin-clarke', 'n-dxb-marina', 'n-bkk-khaosan'];
 
-function CursorTrail({ enabled }: { enabled: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (!enabled || !window.matchMedia('(pointer: fine)').matches) return;
-    const c = ref.current!;
-    const ctx = c.getContext('2d')!;
-    const resize = () => { c.width = innerWidth; c.height = innerHeight; };
-    resize();
-    const pts: { x: number; y: number; life: number; hue: number }[] = [];
-    let raf = 0;
-    const onMove = (e: PointerEvent) => {
-      // Colour follows horizontal position and scroll depth.
-      pts.push({ x: e.clientX, y: e.clientY, life: 1, hue: ((e.clientX / innerWidth) * 220 + scrollY * 0.05) % 360 });
-      if (pts.length > 40) pts.shift();
-      if (!raf) raf = requestAnimationFrame(draw);
-    };
-    const draw = () => {
-      raf = 0;
-      ctx.clearRect(0, 0, c.width, c.height);
-      let alive = false;
-      for (const p of pts) {
-        p.life -= 0.03;
-        if (p.life <= 0) continue;
-        ctx.beginPath();
-        ctx.fillStyle = `hsla(${p.hue}, 95%, 65%, ${p.life * 0.45})`;
-        ctx.arc(p.x, p.y, 3 + p.life * 7, 0, 6.283);
-        ctx.fill();
-        alive = true;
-      }
-      if (alive) raf = requestAnimationFrame(draw);
-      else pts.length = 0;
-    };
-    addEventListener('pointermove', onMove);
-    addEventListener('resize', resize);
-    return () => { cancelAnimationFrame(raf); removeEventListener('pointermove', onMove); removeEventListener('resize', resize); };
-  }, [enabled]);
-  if (!enabled) return null;
-  return <canvas ref={ref} className="cursor-trail" aria-hidden />;
-}
-
 function useQuickPrices(ids: string[]) {
   return useMemo(() => Object.fromEntries(ids.map((id) => {
     const d = getDestination(id)!;
@@ -175,7 +135,6 @@ export default function Home() {
       <PageDolly ids={STAGE.map((s) => s.media)} source={dolly} />
       {stageCredit && <a className="stage-credit" href={stageCredit.source} target="_blank" rel="noreferrer">Background: {fileLabel(stageCredit)} — {creditLine(stageCredit)}</a>}
       <FxLayer fx={STAGE[active].fx} enabled={motion} />
-      <CursorTrail enabled={motion} />
 
 
       <main id="main" tabIndex={-1} style={{ outline: 'none', position: 'relative', zIndex: 4 }}>

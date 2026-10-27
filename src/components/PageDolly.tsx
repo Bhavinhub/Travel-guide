@@ -45,8 +45,8 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
       if (source) read();
       cur += (target - cur) * (reduced ? 1 : 0.12);
       if (Math.abs(target - cur) < 0.0005) cur = target;
-      cmx += (mx - cmx) * 0.08; cmy += (my - cmy) * 0.08;
-      if (camera.current) camera.current.style.transform = `perspective(1200px) rotateY(${(cmx * 3).toFixed(3)}deg) rotateX(${(-cmy * 2).toFixed(3)}deg)`;
+      cmx += (mx - cmx) * 0.07; cmy += (my - cmy) * 0.07;
+      if (camera.current) camera.current.style.transform = `perspective(1100px) rotateY(${(cmx * 6).toFixed(3)}deg) rotateX(${(-cmy * 4).toFixed(3)}deg) translate3d(${(-cmx * 26).toFixed(1)}px, ${(-cmy * 18).toFixed(1)}px, 0)`;
       const i0 = Math.floor(cur), f = cur - i0;
       layers.current.forEach((el, i) => {
         if (!el) return;

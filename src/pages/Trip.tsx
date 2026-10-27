@@ -1,3 +1,4 @@
+import { HeroImage } from '../components/HeroImage';
 import { PackingChecklist } from '../components/PackingChecklist';
 import { useMemo, useState } from 'react';
 import { COMPANY, PRICING_BASIS } from '../config/company';
@@ -271,7 +272,7 @@ export default function Trip() {
         {/* —— 3D photo hero —— */}
         <section className="trip-hero">
           <div className="trip-hero-photo">
-            {imgs[0] ? <img className="zoom-loop" src={srcOf(imgs[0], 'hero')} srcSet={srcSet(imgs[0])} sizes="100vw" alt={`${d.name} — ${fileLabel(imgs[0])}`} /> : <DestImage dest={d} large />}
+            {imgs[0] ? <HeroImage src={srcOf(imgs[0], 'hero')!} srcSet={srcSet(imgs[0])} w={imgs[0].width} h={imgs[0].height} alt={`${d.name} — ${fileLabel(imgs[0])}`} /> : <DestImage dest={d} large />}
           </div>
           <div className="trip-hero-depth" aria-hidden>
             {imgs.slice(1, 3).map((im, i) => <figure key={im.file} className={`trip-float f${i} float3d`}><img src={srcOf(im, 'card')} alt="" /></figure>)}

@@ -35,7 +35,7 @@ export interface WikiSummary {
   lon?: number;
 }
 
-export interface NearbySpot { title: string; description?: string; lat: number; lon: number; dist: number; image?: string; page: string }
+export interface NearbySpot { title: string; description?: string; lat: number; lon: number; dist: number; image?: string; imageW?: number; imageH?: number; page: string }
 
 const WIKI = 'https://en.wikipedia.org';
 
@@ -80,7 +80,7 @@ export async function geocode(q: string, signal?: AbortSignal): Promise<PlaceHit
   }));
 }
 
-interface GenPage { title: string; description?: string; index?: number; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string } }
+interface GenPage { title: string; description?: string; index?: number; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string; width?: number; height?: number } }
 
 /** Wikipedia full-text search (people, temples, ashrams, landmarks…) with typo correction. */
 export async function wikiSearch(q: string, signal?: AbortSignal): Promise<PlaceHit[]> {
@@ -133,7 +133,7 @@ function similarity(a: string, b: string) {
 
 /** Wikipedia entries that are not places a traveller visits. */
 const NOT_TOURISTY = /country in|state in|state of|union territory|district of|district in|newspaper|magazine|province|legislat|parliament|rajya sabha|lok sabha|ministry|government|court|college|school|university|institute|company|bank|hospital|office|constituency|railway|station|political party|district$|tehsil|census town|television|radio|cricket|stadium|police|cantonment|headquarters|embassy|airport|metro/i;
-const SACRED_OR_SCENIC = /temple|ashram|mandir|shrine|math\b|monastery|gompa|mosque|dargah|gurudwara|church|cathedral|ghat|peak|lake|falls|fort|palace|hill|valley|national park|sanctuary|beach|town|city|village|pilgrim/i;
+export const SACRED_OR_SCENIC = /temple|ashram|mandir|shrine|math\b|monastery|gompa|mosque|dargah|gurudwara|church|cathedral|ghat|peak|lake|falls|fort|palace|hill|valley|national park|sanctuary|beach|town|city|village|pilgrim/i;
 
 /** Places linked from an article that have coordinates — e.g. the ashrams and temples connected with a person —
  *  ranked by how often the article mentions them, preferring sacred and scenic places. */
@@ -160,7 +160,7 @@ export async function connectedPlaces(title: string, signal?: AbortSignal): Prom
       .filter((x) => x.score >= 3)
       .sort((a, b) => b.score - a.score)
       .slice(0, 9)
-      .map(({ p }) => ({ title: p.title, description: p.description, lat: p.coordinates![0].lat, lon: p.coordinates![0].lon, image: p.thumbnail?.source, page: `${WIKI}/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`, dist: 0 }));
+      .map(({ p }) => ({ title: p.title, description: p.description, lat: p.coordinates![0].lat, lon: p.coordinates![0].lon, image: p.thumbnail?.source, imageW: p.thumbnail?.width, imageH: p.thumbnail?.height, page: `${WIKI}/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`, dist: 0 }));
   } catch {
     return [];
   }
@@ -216,12 +216,12 @@ export async function placeSummary(h: PlaceHit, signal?: AbortSignal): Promise<W
 /** Notable spots near a point, with photos, from Wikipedia's geosearch. */
 export async function nearbySpots(lat: number, lon: number, signal?: AbortSignal): Promise<NearbySpot[]> {
   try {
-    const j = await getJSON<{ query?: { pages: Record<string, { title: string; description?: string; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string }; index: number }> } }>(
+    const j = await getJSON<{ query?: { pages: Record<string, { title: string; description?: string; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string; width?: number; height?: number }; index: number }> } }>(
       `${WIKI}/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=10000&ggslimit=40&prop=coordinates|pageimages|description&piprop=thumbnail&pithumbsize=1280`, signal);
     const pages = Object.values(j.query?.pages ?? {});
     return pages
       .filter((p) => p.coordinates?.[0])
-      .map((p) => ({ title: p.title, description: p.description, lat: p.coordinates![0].lat, lon: p.coordinates![0].lon, image: p.thumbnail?.source, page: `${WIKI}/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`, dist: kmBetween({ lat, lon }, p.coordinates![0]) }))
+      .map((p) => ({ title: p.title, description: p.description, lat: p.coordinates![0].lat, lon: p.coordinates![0].lon, image: p.thumbnail?.source, imageW: p.thumbnail?.width, imageH: p.thumbnail?.height, page: `${WIKI}/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`, dist: kmBetween({ lat, lon }, p.coordinates![0]) }))
       // Prefer spots that have a photo and are not administrative entries.
       .filter((p) => !/^List of/.test(p.title) && !NOT_TOURISTY.test(`${p.title} ${p.description ?? ''}`))
       .sort((a, b) => Number(!!b.image) - Number(!!a.image) || a.dist - b.dist)

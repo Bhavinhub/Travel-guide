@@ -3,6 +3,7 @@ import { DestinationCard } from '../components/discovery';
 import { LiveWeather } from '../components/LiveWidgets';
 import { MapFlyIn } from '../components/MapFlyIn';
 import { setBackdrop } from '../components/PageDolly';
+import { HeroImage } from '../components/HeroImage';
 import type { Destination } from '../data/types';
 import { weatherLabel, useWeather } from '../lib/live';
 import { connectedPlaces, kmBetween, nearbySpots, nearestCity, nearestCurated, placeHref, placeSummary, type NearbySpot, type PlaceHit, type WikiSummary } from '../lib/places';
@@ -81,7 +82,10 @@ export default function Place() {
 
   // 3D background: photos of this place only.
   useEffect(() => {
-    const urls = [s?.image, ...linked.map((p) => p.image), ...spots.map((p) => p.image)].filter((u, i, a): u is string => !!u && a.indexOf(u) === i).slice(0, 5);
+    // Landscape photos only: portraits or tiny images would be blown up and cropped full-screen.
+    const wide = (src?: string, w?: number, h?: number) => (src && (!w || !h || (w > h * 1.15 && w >= 900)) ? src : undefined);
+    const urls = [wide(s?.image, s?.imageW, s?.imageH), ...linked.map((p) => wide(p.image, p.imageW, p.imageH)), ...spots.map((p) => wide(p.image, p.imageW, p.imageH))]
+      .filter((u, i, a): u is string => !!u && a.indexOf(u) === i).slice(0, 5);
     setBackdrop(urls.map((src) => ({ src })));
   }, [s?.image, spots, linked]);
   useEffect(() => () => setBackdrop([]), []);
@@ -96,7 +100,8 @@ export default function Place() {
   const curated = target ? nearestCurated(target.lat, target.lon, 3) : [];
   const same = curated.find((c) => c.km < 12);
   const sub = [hit.region, hit.country].filter(Boolean).join(', ');
-  const heroImg = s?.image ?? linked.find((p) => p.image)?.image ?? spots.find((p) => p.image)?.image;
+  const alt = linked.find((p) => p.image) ?? spots.find((p) => p.image);
+  const hero = s?.image ? { src: s.image, w: s.imageW, h: s.imageH } : alt ? { src: alt.image!, w: alt.imageW, h: alt.imageH } : null;
   const q = encodeURIComponent([target?.name ?? hit.name, hit.region, hit.country].filter(Boolean).join(', '));
   const pseudo = target ? ({ name: target.name, lat: target.lat, lon: target.lon } as unknown as Destination) : null;
   const city = target ? nearestCity(target.lat, target.lon, hit.country) : undefined;
@@ -117,7 +122,7 @@ export default function Place() {
     <main id="main" tabIndex={-1}>
       <section className="dhero">
         <div className="bg">
-          {heroImg ? <img src={heroImg} alt={`${hit.name} — photograph from Wikipedia`} referrerPolicy="no-referrer" /> : sum === 'loading' ? <div className="skeleton" style={{ position: 'absolute', inset: 0 }} /> : <div className="place-bg-fallback" />}
+          {hero ? <HeroImage src={hero.src} w={hero.w} h={hero.h} alt={`${hit.name} — photograph from Wikipedia`} /> : sum === 'loading' ? <div className="skeleton" style={{ position: 'absolute', inset: 0 }} /> : <div className="place-bg-fallback" />}
         </div>
         <div className="wrap">
           <ol className="crumbs" aria-label="Breadcrumb">

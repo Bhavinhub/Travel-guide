@@ -1,6 +1,8 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
+import { nearbySpots, placeHref, SACRED_OR_SCENIC, type NearbySpot } from '../lib/places';
+import { href, navigate } from '../lib/router';
 import { useMotion } from '../lib/store';
 
 /**
@@ -69,15 +71,38 @@ async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSi
   // Drive only for trips where a car is realistic; islands and long hauls are flown.
   if (crow < 800) {
     try {
-      const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to[1]},${to[0]}?overview=simplified&geometries=geojson`, { signal });
+      const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to[1]},${to[0]}?overview=full&geometries=geojson`, { signal });
       const j = await r.json();
       const g = j.routes?.[0];
       if (g?.geometry?.coordinates?.length > 1 && g.distance / 1000 < crow * 2.2 + 40) {
-        return buildRoute(g.geometry.coordinates.map(([lo, la]: [number, number]) => [la, lo]), 'road', g.distance / 1000, g.duration / 3600);
+        const all: [number, number][] = g.geometry.coordinates.map(([lo, la]: [number, number]) => [la, lo]);
+        const step = Math.max(1, Math.ceil(all.length / 700)); // keep winding mountain roads, cap the point count
+        const pts = all.filter((_, i) => i % step === 0 || i === all.length - 1);
+        return buildRoute(pts, 'road', g.distance / 1000, g.duration / 3600);
       }
     } catch { /* fall back to a straight arc */ }
   }
   return buildRoute(arc(a, to), 'air', crow);
+}
+
+export interface RouteStop extends NearbySpot { frac: number; kmFromStart: number }
+
+/** Beautiful places along the way: sample the route and pick the most scenic photographed spot near each sample. */
+async function scenicStops(r: Route, from: MapOrigin, to: [number, number], signal: AbortSignal): Promise<RouteStop[]> {
+  const total = r.cum[r.cum.length - 1];
+  const samples = (r.mode === 'air' ? [] : [0.12, 0.25, 0.38, 0.5, 0.62, 0.75, 0.88]).map((f) => along(r, f).p);
+  const found = await Promise.all(samples.map((p) => nearbySpots(p[0], p[1], signal).catch(() => [] as NearbySpot[])));
+  const out: RouteStop[] = [];
+  found.forEach((list) => {
+    const pick = list.filter((s) => s.image).sort((a, b) => Number(SACRED_OR_SCENIC.test(`${b.title} ${b.description ?? ''}`)) - Number(SACRED_OR_SCENIC.test(`${a.title} ${a.description ?? ''}`)))[0];
+    if (!pick || out.some((o) => o.title === pick.title)) return;
+    if (kmBetween([pick.lat, pick.lon], [from.lat, from.lon]) < 20 || kmBetween([pick.lat, pick.lon], to) < 4) return;
+    // Where on the route this stop sits.
+    let best = 0, bd = Infinity;
+    r.pts.forEach((q, i) => { const d = kmBetween(q, [pick.lat, pick.lon]); if (d < bd) { bd = d; best = i; } });
+    out.push({ ...pick, frac: r.cum[best] / total, kmFromStart: Math.round(r.cum[best]) });
+  });
+  return out.sort((a, b) => a.frac - b.frac);
 }
 
 export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { lat: number; lon: number; name: string; spots?: MapSpot[]; zoomTo?: number; from?: MapOrigin }) {
@@ -91,6 +116,10 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
   const spotLayer = useRef<L.LayerGroup | null>(null);
   const routeRef = useRef<{ r: Route; group: L.LayerGroup; done: L.Polyline; mover: L.Marker; fitZoom: number; center: L.LatLng } | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
+  const [stops, setStops] = useState<RouteStop[]>([]);
+  const stopsRef = useRef<RouteStop[]>([]);
+  const [card, setCard] = useState(-1);
+  const cardRef = useRef(-1);
   const [mode, setMode] = useState<'satellite' | 'street'>('satellite');
   const [free, setFree] = useState(false);
   const freeRef = useRef(false);
@@ -137,16 +166,25 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
       L.marker(r.pts[0], { icon: L.divIcon({ className: 'map-origin', html: `<span></span><b>${esc(from.name)}</b>`, iconSize: [0, 0] }), keyboard: false }).addTo(group);
       const mover = L.marker(r.pts[0], { icon: L.divIcon({ className: 'map-mover', html: r.mode === 'air' ? '✈' : '🚗', iconSize: [30, 30] }), keyboard: false, zIndexOffset: 900 }).addTo(group);
       const bounds = full.getBounds();
-      const fitZoom = Math.min(zoomTo - 1.5, m.getBoundsZoom(bounds.pad(0.2), false));
+      const fitZoom = Math.min(zoomTo - 1.5, m.getBoundsZoom(bounds.pad(0.75), false));
       routeRef.current = { r, group, done, mover, fitZoom, center: bounds.getCenter() };
       setRoute(r);
       dispatchEvent(new Event('scroll'));
+      scenicStops(r, from, [lat, lon], ctl.signal).then((st) => {
+        if (ctl.signal.aborted) return;
+        stopsRef.current = st; setStops(st);
+        st.forEach((s, i) => {
+          L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'map-photo', html: `<img src="${esc(s.image ?? '')}" alt="" referrerpolicy="no-referrer"><b>${esc(s.title)}</b>`, iconSize: [46, 46], iconAnchor: [23, 23] }), keyboard: false, zIndexOffset: 800 })
+            .addTo(group).on('click', () => { cardRef.current = i; setCard(i); });
+        });
+      });
     });
     return () => {
       ctl.abort();
       routeRef.current?.group.remove();
       routeRef.current = null;
       setRoute(null);
+      stopsRef.current = []; setStops([]); cardRef.current = -1; setCard(-1);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromKey, lat, lon]);
@@ -175,7 +213,7 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
       const e = smooth(p);
       center = [lat, lon]; zoom = lerp(2.4, zoomTo, e); tilt = e;
     } else {
-      const follow = Math.max(rr.fitZoom, Math.min(rr.fitZoom + 2.2, 11, zoomTo - 0.5));
+      const follow = Math.max(rr.fitZoom, Math.min(rr.fitZoom + 1.4, 10.5, zoomTo - 1)); // close enough to see the land, wide enough to see where you are
       const c: [number, number] = [rr.center.lat, rr.center.lng];
       if (p < 0.15) {
         // Orbit → the whole route in view.
@@ -190,10 +228,15 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
         zoom = lerp(rr.fitZoom, follow, e); tilt = 0.55 * e;
         rr.done.setLatLngs([...rr.r.pts.slice(0, i), pt]);
         rr.mover.setLatLng(pt);
+        // Postcard of the beautiful place the journey is passing right now.
+        const frac = smooth(t);
+        const near = stopsRef.current.findIndex((st) => Math.abs(st.frac - frac) < 0.065);
+        if (near !== cardRef.current) { cardRef.current = near; setCard(near); }
       } else {
         // Arrive and descend into the place.
         const e = smooth((p - 0.85) / 0.15);
         center = [lat, lon]; zoom = lerp(follow, zoomTo, e); tilt = lerp(0.55, 1, e);
+        if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
         rr.done.setLatLngs(rr.r.pts); rr.mover.setLatLng([lat, lon]);
       }
     }
@@ -265,12 +308,19 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
     : null;
 
   return (
+    <>
     <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}`} aria-label={`Satellite map of ${name}`}>
       <div className="mapfly-sticky">
         <div ref={stage} className="mapfly-stage" style={{ '--p': reduced ? 1 : 0 } as React.CSSProperties}>
           <div ref={el} className="mapfly-map" />
         </div>
         {routeLabel && <p className="mapfly-route small">{routeLabel}</p>}
+        {stops.map((s, i) => (
+          <div key={s.title} className={`mapfly-card glass${card === i ? ' is-on' : ''}`} aria-hidden={card !== i}>
+            {s.image && <img src={s.image} alt={s.title} referrerPolicy="no-referrer" />}
+            <div><span className="tiny muted">On the way · {s.kmFromStart} km from {from?.name}</span><b>{s.title}</b>{s.description && <span className="tiny muted">{s.description}</span>}</div>
+          </div>
+        ))}
         <div className="mapfly-ui glass">
           <div className="seg" role="group" aria-label="Map type">
             <button aria-pressed={mode === 'satellite'} onClick={() => setMode('satellite')}>Satellite</button>
@@ -289,5 +339,23 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
         {!free && !reduced && <p className="mapfly-hint small">{playing ? `Travelling${from ? ` from ${from.name}` : ''} to ${name}…` : `Scroll — or tap the ${name} pin — to travel${from ? ` from ${from.name}` : ''}`}</p>}
       </div>
     </section>
+    {stops.length > 0 && (
+      <div className="route-views">
+        <h3 style={{ margin: '0 0 .3rem' }}>Beautiful views along the way</h3>
+        <p className="small muted" style={{ margin: '0 0 .8rem' }}>Photographed places near the route from {from?.name} — tap one to open its guide. Round photo markers show each on the map.</p>
+        <div className="route-strip">
+          {stops.map((s) => {
+            const to = placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon });
+            return (
+              <a key={s.title} className="spot-card glass" href={href(to)} onClick={(e) => { e.preventDefault(); navigate(to); }}>
+                {s.image && <img src={s.image} alt={s.title} loading="lazy" referrerPolicy="no-referrer" />}
+                <span className="spot-body"><b>{s.title}</b><span className="tiny muted">{s.kmFromStart} km into the journey{s.description ? ` · ${s.description}` : ''}</span></span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
