@@ -25,7 +25,7 @@ export const setBackdrop = (photos: BackdropPhoto[]) => useBackdrop.setState({ p
 /** `source` lets a page drive the camera itself (e.g. the home page's chapter progress, 0…n-1). */
 export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos?: BackdropPhoto[]; source?: { progress: number } }) {
   const local = ids.map((id) => localImages(id)[0]).filter(Boolean).map((im) => ({ src: srcOf(im!, 'large')!, srcSet: srcSet(im!), fill: srcOf(im!, 'card'), key: im!.sizes['960'] ?? im!.file }));
-  const imgs = (photos?.length ? photos.map((p) => ({ ...p, key: p.src })) : local).filter((x, i, a) => !!source || a.findIndex((y) => y.key === x.key) === i).slice(0, source ? 24 : 8); // keep order intact when a page drives the camera
+  const imgs = (photos?.length ? photos.map((p) => ({ ...p, key: p.src })) : local).filter((x, i, a) => !!source || a.findIndex((y) => y.key === x.key) === i).slice(0, source ? 40 : 8); // keep order intact when a page drives the camera
   const camera = useRef<HTMLDivElement>(null);
   const layers = useRef<(HTMLDivElement | null)[]>([]);
   const mains = useRef<(HTMLImageElement | null)[]>([]);
@@ -36,7 +36,7 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
   useEffect(() => {
     if (!n) return;
     const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
-    let raf = 0, cur = 0, target = 0, mx = 0, my = 0, cmx = 0, cmy = 0;
+    let raf = 0, cur = 0, target = 0, mx = 0, my = 0, cmx = 0, cmy = 0, lastT = performance.now();
     const read = () => {
       if (source) { target = Math.min(n - 1, Math.max(0, source.progress)); return; }
       const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
@@ -45,7 +45,9 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
     const frame = () => {
       raf = 0;
       if (source) read();
-      cur += (target - cur) * (reduced ? 1 : 0.12);
+      const now = performance.now(), dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+      lastT = now;
+      cur += (target - cur) * (reduced ? 1 : 1 - Math.exp(-dt * 2.4)); // slow, soft camera glide
       if (Math.abs(target - cur) < 0.0005) cur = target;
       cmx += (mx - cmx) * 0.07; cmy += (my - cmy) * 0.07;
       if (camera.current) camera.current.style.transform = `perspective(1100px) rotateY(${(cmx * 6).toFixed(3)}deg) rotateX(${(-cmy * 4).toFixed(3)}deg) translate3d(${(-cmx * 26).toFixed(1)}px, ${(-cmy * 18).toFixed(1)}px, 0)`;
@@ -53,14 +55,14 @@ export function PageDolly({ ids = [], photos, source }: { ids?: string[]; photos
       layers.current.forEach((el, i) => {
         if (!el) return;
         let o = 0, s = 1, z = 0;
-        if (i === i0) { o = 1 - Math.max(0, (f - 0.6) / 0.4); s = 1 + Math.max(0, f - 0.55) * ZOOM; z = f; } // zoom in, then dissolve
+        if (i === i0) { o = 1 - smooth(Math.max(0, (f - 0.68) / 0.32)); s = 1 + Math.max(0, f - 0.6) * ZOOM * 0.5; z = f; } // slow zoom across the whole stretch, gentle dissolve at the end
         else if (i === i0 + 1) { o = 1; } // the next scene waits behind, whole and fully visible
         // At rest the photo shows at its widest framing; scrolling zooms the camera in towards the next
         // scene, and scrolling back pulls out again.
         const img = mains.current[i];
         if (img) {
-          const k = smooth(Math.min(1, z / 0.6));
-          img.style.transform = `scale(${(1 + 0.28 * k).toFixed(4)})`; // widest framing at rest → in towards the next scene
+          const k = z; // linear: the zoom keeps moving steadily with the scroll
+          img.style.transform = `scale(${(1 + 0.24 * k).toFixed(4)})`; // widest framing at rest → in towards the next scene
         }
         const drift = i === i0 ? f : i === i0 + 1 ? f - 1 : 0; // a gentle cinematic drift between scenes
         const show = o > 0.001;

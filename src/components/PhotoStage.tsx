@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Destination } from '../data/types';
 import { creditLine, fileLabel, localImages, srcOf, srcSet, type LocalImage } from '../lib/localMedia';
 import { useMedia } from '../lib/media';
@@ -107,11 +107,6 @@ export function PhotoStage({ chapters, active, motion }: { chapters: StageChapte
   useEffect(() => {
     setTrail((t) => (t.cur === active ? t : { prev: t.cur, cur: active, dir: active > t.cur ? 'down' : 'up', n: t.n + 1 }));
   }, [active]);
-  const credit = useMemo(() => {
-    if (ch.video && motion) return { text: ch.video.credit, href: ch.video.source };
-    const img = localImages(ch.media)[0];
-    return img ? { text: `${fileLabel(img)} — ${creditLine(img)}`, href: img.source } : null;
-  }, [ch, motion]);
   return (
     <div className={`stage ${motion ? 'moving' : ''} dir-${trail.dir}`} style={{ ['--stage-accent' as string]: ch.accent }}>
       <div className="stage-rig">
@@ -125,9 +120,6 @@ export function PhotoStage({ chapters, active, motion }: { chapters: StageChapte
       </div>
       <div className="stage-shade" aria-hidden />
       <div className="cursor-light" aria-hidden />
-      {credit && (
-        <a className="stage-credit" href={credit.href} target="_blank" rel="noreferrer">Background: {credit.text}</a>
-      )}
     </div>
   );
 }

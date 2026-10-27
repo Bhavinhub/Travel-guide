@@ -3657,5 +3657,25 @@
     }
    }
   ]
+ },
+ "kedarnath-day": {
+  "article": "Kedarnath Temple",
+  "caption": "Kedarnath Temple below the snow peaks on a clear October morning",
+  "images": [
+   {
+    "file": "File:Kedarnath temple in uttarakhand.jpg",
+    "width": 4000,
+    "height": 1800,
+    "author": "Nehasnaps0306",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kedarnath_temple_in_uttarakhand.jpg",
+    "sizes": {
+     "960": "/media/kedarnath-day/0-960.jpg",
+     "1920": "/media/kedarnath-day/0-1920.jpg",
+     "3840": "/media/kedarnath-day/0-3840.jpg"
+    }
+   }
+  ]
  }
 }

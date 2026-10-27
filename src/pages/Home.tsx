@@ -16,7 +16,6 @@ import { defaultConfig } from '../lib/trip';
 import { localImages } from '../lib/localMedia';
 
 import { dolly } from '../scene/dollyState';
-import { creditLine, fileLabel } from '../lib/localMedia';
 
 const CHAPTERS = [
   { id: 'forest', title: 'Kedarnath Temple', short: 'Kedarnath' },
@@ -30,7 +29,7 @@ const CHAPTERS = [
 
 /** Real photographs per chapter (downloaded from Wikimedia Commons; see CREDITS.md). */
 export const STAGE: (StageChapter & { fx: Fx; ambience: Ambience })[] = [
-  { id: 'forest', media: 'u-kedarnath', focusY: 0.66, fallbackWiki: 'Kedarnath Temple', accent: '#f4dca0', fx: 'pollen', ambience: 'forest', depth: [{ media: 'm-peafowl', label: 'Indian peafowl' }, { media: 'm-tea', label: 'Tea gardens' }] },
+  { id: 'forest', media: 'kedarnath-day', focusY: 0.55, fallbackWiki: 'Kedarnath Temple', accent: '#f4dca0', fx: 'pollen', ambience: 'forest', depth: [{ media: 'u-kedarnath', label: 'Kedarnath at dusk' }, { media: 'm-peafowl', label: 'Indian peafowl' }] },
   { id: 'rainforest', media: 'u-kerala', fallbackWiki: 'Athirappilly Falls', accent: '#5fbf86', fx: 'pollen', ambience: 'rain', depth: [{ media: 'm-elephant', label: 'Asian elephants' }, { media: 'm-backwaters', label: 'Kerala backwaters' }] },
   { id: 'valley', media: 'u-pangong', fallbackWiki: 'Kullu Valley', accent: '#a9d6ff', fx: 'pollen', ambience: 'wind', depth: [{ media: 'm-tahr', label: 'Nilgiri tahr' }, { media: 'manali', label: 'Manali' }] },
   { id: 'snow', media: 'ch-snow', fallbackWiki: 'Gurudongmar Lake', accent: '#dbeeff', fx: 'snow', ambience: 'wind', depth: [{ media: 'leh', label: 'Leh' }, { media: 'srinagar', index: 1, label: 'Kashmir' }] },
@@ -38,10 +37,6 @@ export const STAGE: (StageChapter & { fx: Fx; ambience: Ambience })[] = [
   { id: 'city', media: 'u-mumbai', fallbackWiki: 'Marine Drive, Mumbai', accent: '#ffcf8a', fx: 'bokeh', ambience: 'city', depth: [{ media: 'm-shibuya', label: 'Tokyo' }, { media: 'm-timessq', label: 'New York' }] },
   { id: 'discover', media: 'u-taj', fallbackWiki: 'Taj Mahal', accent: '#c9b6ff', fx: 'stars', ambience: 'wind', depth: [{ media: 'm-holi', label: 'Holi' }, { media: 'm-aarti', label: 'Ganga aarti' }] },
 ];
-
-const HOME_BACKDROP = STAGE.flatMap((s, i) => (i < STAGE.length - 1 ? [s.media, s.depth[0]?.media ?? s.media, s.depth[1]?.media ?? s.media] : [s.media]));
-/** Chapter progress (0…6) → backdrop progress across both photos of each chapter. */
-const homeDolly = { get progress() { return dolly.progress * 3; } }; // chapter i's own photo sits at 3i
 
 const STORIES: { eyebrow: string; title: string; body: string; portals: string[]; side?: 'right' }[] = [
   { eyebrow: 'Chapter 1 · Forest & hills', title: 'Discover your next extraordinary journey.', body: 'Explore India and the world through immersive destinations, personalised itineraries, and clear travel estimates.', portals: [] },
@@ -51,6 +46,25 @@ const STORIES: { eyebrow: string; title: string; body: string; portals: string[]
   { eyebrow: 'Chapter 5 · The Maldives', title: 'Turquoise water, long golden evenings.', body: 'Coral islands, Latin-quarter lanes and overwater villas — slow down where the land meets the sea.', portals: ['goa', 'havelock', 'pondicherry', 'male', 'phuket', 'maafushi'] },
   { eyebrow: 'Chapter 6 · Mumbai after dark', title: 'Skylines that come alive after dark.', body: 'Street food at midnight, rooftop views and museums worth crossing oceans for.', portals: ['bengaluru', 'mumbai', 'new-york', 'los-angeles', 'bangkok', 'tokyo', 'dubai', 'singapore', 'paris', 'london'], side: 'right' },
 ];
+
+/** Five photos per chapter — its scene, two related moments and two of its featured destinations — so the
+ *  camera glides continuously through far more imagery while the story beats stay the same. */
+const PER_CHAPTER = 5;
+const HOME_BACKDROP = (() => {
+  const used = new Set<string>();
+  // Spare photos (unused destinations) fill any chapter that has fewer of its own — never a repeat in a row.
+  const spare = ['kedarnath', 'nainital', 'rishikesh', 'mussoorie', 'darjeeling', 'udaipur', 'jaipur', 'varanasi', 'hampi', 'gangtok', 'shimla', 'ooty'].filter((id) => localImages(id).length);
+  const take = (id?: string) => (id && !used.has(id) && localImages(id).length ? (used.add(id), id) : undefined);
+  return STAGE.flatMap((s, i) => {
+    used.add(s.media);
+    if (i === STAGE.length - 1) return [s.media];
+    const own = [s.depth[0]?.media, s.depth[1]?.media, ...(STORIES[i]?.portals ?? [])].map(take).filter(Boolean) as string[];
+    while (own.length < PER_CHAPTER - 1) { const next = spare.find((id) => !used.has(id)); if (!next) break; own.push(take(next)!); }
+    return [s.media, ...Array.from({ length: PER_CHAPTER - 1 }, (_, k) => own[k] ?? s.depth[0]?.media ?? s.media)];
+  });
+})();
+/** Chapter progress (continuous) → position in the backdrop; chapter i's own scene sits at i × 5. */
+const homeDolly = { get progress() { return dolly.progress * PER_CHAPTER; } };
 
 const BEST_INDIA = ['agra', 'udaipur', 'jaipur', 'kedarnath', 'munnar', 'goa', 'srinagar', 'leh', 'varanasi', 'havelock', 'nainital', 'rishikesh', 'darjeeling'];
 const BEST_WORLD = ['bali', 'male', 'paris', 'singapore', 'bangkok', 'dubai', 'tokyo', 'interlaken', 'new-york', 'phuket', 'london', 'kyoto'];
@@ -71,7 +85,6 @@ export default function Home() {
   const money = useMoney();
   const portal = usePortal();
   const [active, setActive] = useState(0);
-  const stageCredit = localImages(STAGE[active].media)[0];
   const sections = useRef<(HTMLElement | null)[]>([]);
   const bar = useRef<HTMLDivElement>(null);
   usePointerDepth(motion);
@@ -94,8 +107,8 @@ export default function Home() {
       const next = i < els.length - 1 ? els[i + 1].offsetTop : start;
       // Hold the camera on each photo for the first part of its section, then dolly to the next.
       const raw = Math.min(1, Math.max(0, (scrollY - start) / Math.max(1, next - start)));
-      const eased = raw <= 0.6 ? 0 : ((t) => t * t * (3 - 2 * t))((raw - 0.6) / 0.4);
-      dolly.progress = i < els.length - 1 ? i + eased : i;
+      // Continuous: the camera keeps gliding the whole time the visitor scrolls (no hold, then jump).
+      dolly.progress = i < els.length - 1 ? i + raw : i;
       const max = document.documentElement.scrollHeight - innerHeight;
       if (bar.current) bar.current.style.transform = `scaleX(${Math.min(1, scrollY / Math.max(1, max))})`;
       setActive(i);
@@ -136,9 +149,8 @@ export default function Home() {
     <>
       <div className="chapter-progress no-print" ref={bar} style={{ transform: 'scaleX(0)', width: '100%' }} aria-hidden />
       {/* Scroll-controlled camera dolly through the chapter photos (sharp, GPU-only, reverses on scroll up). */}
-      {/* Three photos per chapter (its scene, then two related moments) — far more imagery, same story beats. */}
+      {/* Five photos per chapter, gliding continuously with the scroll. */}
       <PageDolly ids={HOME_BACKDROP} source={homeDolly} />
-      {stageCredit && <a className="stage-credit" href={stageCredit.source} target="_blank" rel="noreferrer">Background: {fileLabel(stageCredit)} — {creditLine(stageCredit)}</a>}
       <FxLayer fx={STAGE[active].fx} enabled={motion} />
 
 
@@ -164,7 +176,6 @@ export default function Home() {
                       <a className="btn btn-sm btn-ghost" href={href('/plan')}>Skip to trip planner →</a>
                       <button className="btn btn-sm btn-ghost" onClick={() => goTo(CHAPTERS.length - 1)}>Jump to destinations ↓</button>
                     </div>
-                    <div className="scroll-cue" aria-hidden><i /> Scroll to begin · move the cursor to look around</div>
                     <p className="sr-only">Keyboard: press N or P for the next or previous chapter.</p>
                   </div>
                 ) : (
