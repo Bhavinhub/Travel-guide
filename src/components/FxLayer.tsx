@@ -14,7 +14,8 @@ export function FxLayer({ fx, enabled }: { fx: Fx; enabled: boolean }) {
   const fxRef = useRef(fx);
   fxRef.current = fx;
   useEffect(() => {
-    if (!enabled) return;
+    // Phones: the full-screen particle canvas costs more battery and smoothness than it adds.
+    if (!enabled || matchMedia('(pointer: coarse)').matches || innerWidth < 760) return;
     const c = ref.current!;
     const ctx = c.getContext('2d')!;
     let W = 0, H = 0, raf = 0, mx = 0, my = 0, lastY = scrollY, sv = 0;

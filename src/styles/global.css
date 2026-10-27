@@ -519,8 +519,12 @@ html[data-motion='reduced'] .marquee, .paused-motion .marquee { animation: none;
 .reveal { opacity: 0; transform: perspective(1000px) translate3d(0, 50px, -160px) rotateX(16deg) scale(.94); transition: opacity .9s var(--ease), transform 1.1s var(--ease); transform-origin: 50% 100%; }
 .reveal.in { opacity: 1; transform: none; }
 html[data-motion='reduced'] .reveal { opacity: 1; transform: none; }
-.route-stage { animation: routeIn .9s var(--ease) both; transform-origin: 50% 30vh; }
-@keyframes routeIn { from { opacity: 0; transform: perspective(1200px) translateZ(-260px) rotateX(10deg) scale(.9); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.route-stage { animation: routeIn .55s var(--ease) both; }
+/* A light fade-and-rise between pages: tilting/blurring the whole (very tall) page made it thousands of
+   pixels wide for a moment — phones re-laid out and zoomed, and the blur was very heavy. */
+@keyframes routeIn { from { opacity: 0; transform: translate3d(0, 18px, 0); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px), (pointer: coarse) { .route-stage { animation-name: routeFade; animation-duration: .35s; } }
+@keyframes routeFade { from { opacity: 0; } to { opacity: 1; } }
 html[data-motion='reduced'] .route-stage { animation: none; }
 .zoom-loop { animation: zoomLoop 24s ease-in-out infinite alternate; }
 @keyframes zoomLoop { from { transform: scale(1); } to { transform: scale(1.1); } }
@@ -1424,3 +1428,26 @@ html body:has(.page-dolly) .glass { background: linear-gradient(160deg, rgba(22,
 html[data-theme='light'] body:has(.page-dolly) .glass { background: linear-gradient(160deg, rgba(255, 255, 255, .92), rgba(240, 246, 250, .86)); }
 html body:has(.page-dolly) main .editorial { background: rgba(8, 18, 24, .78); }
 html[data-theme='light'] body:has(.page-dolly) main .editorial { background: rgba(255, 255, 255, .88); }
+
+/* ═══ Phones and tablets (touch) ═══ */
+.ring-wrap { touch-action: pan-y; } /* sideways swipes turn the ring, up/down still scrolls the page */
+.ring-card img { -webkit-user-drag: none; user-select: none; }
+.for-touch { display: none; }
+@media (hover: none), (pointer: coarse) { .for-touch { display: inline; } .for-mouse { display: none; } }
+/* Phone map controls: every button visible (two tidy rows), none hidden off the edge. */
+@media (max-width: 640px) {
+  html body .mapfly .mapfly-ui { flex-wrap: wrap; overflow: visible; justify-content: center; gap: .35rem; left: .5rem; right: .5rem; max-width: none; }
+  html body .mapfly .mapfly-ui > * { font-size: .78rem; padding: .38rem .7rem; min-height: 34px; }
+  html body .mapfly .mapfly-ui .seg button { padding: .3rem .6rem; }
+  html body .mapfly .mapfly-card { bottom: 7.4rem; }
+}
+/* Dropdowns and dialogs sit on top of other content: always solid, never see-through. */
+html body .nav-results, html body:has(.page-dolly) .nav-results.glass, html body .mf-list, html body .drawer-panel.glass { background: #0e1a24 !important; }
+html[data-theme='light'] body .nav-results, html[data-theme='light'] body:has(.page-dolly) .nav-results.glass, html[data-theme='light'] body .mf-list, html[data-theme='light'] body .drawer-panel.glass { background: #ffffff !important; }
+/* Phones: the moments strip is a swipeable row that snaps photo by photo (no auto-slide). */
+@media (hover: none), (pointer: coarse) {
+  html body .marquee { width: auto !important; max-width: 100%; padding-inline: 16px; animation: none !important; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; scrollbar-width: none; transform: none !important; }
+  html body .marquee::-webkit-scrollbar { display: none; }
+  html body .marquee .moment { scroll-snap-align: center; flex: none; }
+  html body .marquee .moment.is-dup { display: none; }
+}

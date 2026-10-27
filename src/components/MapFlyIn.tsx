@@ -595,6 +595,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     const m = map.current;
     if (!m) return;
     [m.scrollZoom, m.dragPan, m.dragRotate, m.doubleClickZoom, m.touchZoomRotate, m.keyboard, m.boxZoom, m.touchPitch].forEach((h) => (on ? h.enable() : h.disable()));
+    // Touch screens inside the page: one finger keeps scrolling the page, two fingers move the map
+    // (otherwise a full-screen map traps the finger). In full screen one finger moves the map.
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    if (on && coarse && !fullRef.current) m.cooperativeGestures.enable(); else m.cooperativeGestures.disable();
   };
   useEffect(() => { if (reduced) setInteractive(true); }, [reduced, lat, lon]);
 
@@ -646,6 +650,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     fullRef.current = full;
     if (full) setInteractive(true);
     else if (!freeRef.current) { setInteractive(false); kick.current(); }
+    else setInteractive(true); // back in the page while exploring: two-finger map on touch screens again
     // (the map's ResizeObserver redraws it at the new size)
     return () => document.documentElement.classList.remove('map-full');
   }, [full]); // eslint-disable-line react-hooks/exhaustive-deps

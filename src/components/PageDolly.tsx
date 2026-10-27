@@ -46,7 +46,9 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const heroBg = useRef<HTMLDivElement>(null);
   const heroBgImg = heroBackdrop ? localImages(heroBackdrop)[0] : undefined;
-  const fieldImgs = field.map((id) => localImages(id)[0]).filter(Boolean).slice(0, FIELD_SPOTS.length).map((im) => ({ src: thumbOf(im!)!, key: im!.file }));
+  // Phones: no floating photo field (cluttered on a small screen and costly for a phone's GPU).
+  const lite = typeof window !== 'undefined' && (matchMedia('(pointer: coarse)').matches || innerWidth < 760);
+  const fieldImgs = (lite ? [] : field).map((id) => localImages(id)[0]).filter(Boolean).slice(0, FIELD_SPOTS.length).map((im) => ({ src: thumbOf(im!)!, key: im!.file }));
   const { reduced } = useMotion();
   const kickRef = useRef<() => void>(() => undefined);
   const n = imgs.length;

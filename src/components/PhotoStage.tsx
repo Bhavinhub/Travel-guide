@@ -131,11 +131,29 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
   // Live interaction state lives in refs, so hovering never restarts the animation (it used to snap back).
   const over = useRef(false);
   const overCard = useRef(false);
+  const dragMoved = useRef(0);
   const n = items.length;
   const cardW = 230;
   const radius = Math.round(cardW / 2 / Math.tan(Math.PI / n) + 60);
   useEffect(() => {
     let a = 0, speed = 6, target = 6, raf = 0, last = performance.now(), visible = false;
+    // Touch: drag the ring with a finger, it keeps turning with the flick's momentum, then settles on a card.
+    let drag: { lastX: number; lastT: number; v: number } | null = null, flung = false;
+    const el = wrap.current;
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      drag = { lastX: e.clientX, lastT: performance.now(), v: 0 }; dragMoved.current = 0; flung = false;
+      if (!raf && visible) { last = performance.now(); raf = requestAnimationFrame(tick); }
+    };
+    const onDrag = (e: PointerEvent) => {
+      if (!drag || e.pointerType === 'mouse') return;
+      const now = performance.now(), dx = e.clientX - drag.lastX, dt = Math.max(1, now - drag.lastT) / 1000;
+      a -= dx * 0.32; // degrees per pixel
+      drag.v = drag.v * 0.6 + ((-dx * 0.32) / dt) * 0.4;
+      drag.lastX = e.clientX; drag.lastT = now; dragMoved.current += Math.abs(dx);
+      if (ring.current) ring.current.style.transform = `translateZ(${-radius}px) rotateY(${-a}deg)`;
+    };
+    const onUp = () => { if (!drag) return; speed = Math.max(-260, Math.min(260, drag.v)); drag = null; flung = true; };
     const onMove = (e: PointerEvent) => {
       const r = wrap.current?.getBoundingClientRect();
       if (!r || e.clientY < r.top - 100 || e.clientY > r.bottom + 100) { target = 6; return; }
@@ -149,6 +167,16 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
       raf = 0;
       const dt = Math.min(0.05, (t - last) / 1000);
       last = t;
+      if (drag) { if (visible) raf = requestAnimationFrame(tick); return; } // the finger is turning it
+      if (flung) {
+        // After a swipe: coast, slow down, and stop with a card squarely in front.
+        speed *= Math.exp(-dt * 2.2);
+        a += speed * dt;
+        if (Math.abs(speed) < 12) { const step = 360 / n, nearest = Math.round(a / step) * step; a += (nearest - a) * (1 - Math.exp(-dt * 6)); }
+        if (ring.current) ring.current.style.transform = `translateZ(${-radius}px) rotateY(${-a}deg)`;
+        if (visible) raf = requestAnimationFrame(tick);
+        return;
+      }
       const goal = over.current ? target : 6; // the calm zone in the middle is what stops it for clicking
       if (over.current && Math.abs(target) < 0.5 && Math.abs(speed) < 4) {
         // Resting in the calm zone: settle so a card faces you squarely (never a gap in the middle).
@@ -167,6 +195,9 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
       visible = e.isIntersecting;
       if (visible && motion && !raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
     }, { rootMargin: '100px 0px' });
+    el?.addEventListener('pointerdown', onDown, { passive: true });
+    el?.addEventListener('pointermove', onDrag, { passive: true });
+    addEventListener('pointerup', onUp); addEventListener('pointercancel', onUp);
     if (motion) {
       if (wrap.current) io.observe(wrap.current);
       addEventListener('pointermove', onMove, { passive: true });
@@ -175,10 +206,13 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
       cancelAnimationFrame(raf);
       io.disconnect();
       removeEventListener('pointermove', onMove);
+      el?.removeEventListener('pointerdown', onDown); el?.removeEventListener('pointermove', onDrag);
+      removeEventListener('pointerup', onUp); removeEventListener('pointercancel', onUp);
     };
   }, [motion, radius, n]);
   return (
-    <div className="ring-wrap" ref={wrap} onPointerEnter={() => { over.current = true; }} onPointerLeave={() => { over.current = false; overCard.current = false; }}>
+    <div className="ring-wrap" ref={wrap} onPointerEnter={(e) => { if (e.pointerType === 'mouse') over.current = true; }} onPointerLeave={() => { over.current = false; overCard.current = false; }}
+      onClickCapture={(e) => { if (dragMoved.current > 10) { e.stopPropagation(); e.preventDefault(); dragMoved.current = 0; } }}>
       <div className="ring-scene" style={{ ['--r' as string]: `${radius}px` }}>
         <div className="ring" ref={ring} role="list" aria-label={label}>
           {items.map((d, i) => {
@@ -199,7 +233,7 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
           })}
         </div>
       </div>
-      <p className="tiny muted ring-hint">Move the cursor left or right to turn the ring · hold near the centre to stop · click a photo to open it</p>
+      <p className="tiny muted ring-hint"><span className="for-mouse">Move the cursor left or right to turn the ring · hold near the centre to stop · click a photo to open it</span><span className="for-touch">Swipe left or right to turn the ring · tap a photo to open it</span></p>
     </div>
   );
 }
@@ -222,7 +256,7 @@ export function MomentsMarquee({ ids }: { ids: string[] }) {
     <div ref={scene} className="marquee-scene">
       <div className="marquee" aria-hidden>
         {loop.map((m, i) => (
-          <figure key={`${m.id}-${i}`} className="moment">
+          <figure key={`${m.id}-${i}`} className={`moment${i >= items.length ? ' is-dup' : ''}`}>
             <img src={srcOf(m.img!, 'card')} alt="" loading="lazy" />
             <figcaption>{fileLabel(m.img!)}<br /><span>{creditLine(m.img!)}</span></figcaption>
           </figure>

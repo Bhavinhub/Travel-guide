@@ -197,15 +197,16 @@
   "caption": "Holi, the festival of colours",
   "images": [
    {
-    "file": "File:Narasimha Disemboweling Hiranyakashipu, Folio from a Bhagavata Purana (Ancient Stories of the Lord) LACMA M.82.42.8 (1 of 5).jpg",
-    "width": 2100,
-    "height": 1313,
-    "author": "Unknown",
-    "license": "Public domain",
-    "source": "https://commons.wikimedia.org/wiki/File%3ANarasimha_Disemboweling_Hiranyakashipu%2C_Folio_from_a_Bhagavata_Purana_(Ancient_Stories_of_the_Lord)_LACMA_M.82.42.8_(1_of_5).jpg",
+    "file": "File:HOLI FESTIVAL IN INDIA 04.jpg",
+    "width": 4928,
+    "height": 3264,
+    "author": "DEBA PRASAD ROY",
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0",
+    "source": "https://commons.wikimedia.org/wiki/File:HOLI_FESTIVAL_IN_INDIA_04.jpg",
     "sizes": {
-     "960": "/media/m-holi/0-960.jpg",
-     "1920": "/media/m-holi/0-1920.jpg"
+     "960": "/media/m-holi/h-960.jpg",
+     "1920": "/media/m-holi/h-1920.jpg"
     }
    }
   ]
