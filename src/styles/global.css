@@ -1395,3 +1395,32 @@ body::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 
   background: linear-gradient(180deg, rgba(4, 9, 16, .92) 0%, rgba(4, 9, 16, .7) 55%, rgba(4, 9, 16, 0) 100%); }
 html[data-theme='light'] body::before { background: linear-gradient(180deg, rgba(241, 245, 242, .95) 0%, rgba(241, 245, 242, .75) 55%, rgba(241, 245, 242, 0) 100%); }
 html.map-full body::before { display: none; }
+
+/* ═══ Rendering budget: nothing animates forever unless it is cheap (GPU-composited) and on screen ═══ */
+/* Logo globe: the texture strip slides with a GPU transform instead of repainting a background each frame. */
+.lg-earth { overflow: hidden; animation: none !important; background: none !important; }
+.lg-strip { position: absolute; left: 0; top: 0; width: 176px; height: 44px; background-size: 88px 44px; background-repeat: repeat-x; will-change: transform; animation: lgStrip 22s linear infinite; }
+@keyframes lgStrip { to { transform: translate3d(-88px, 0, 0); } }
+.brand:hover .lg-strip { animation-duration: 6s; }
+html[data-motion='reduced'] .lg-strip { animation: none; }
+/* Wordmark: the light sweeps once on load and again on hover — no endless repaint of large shadowed text. */
+.wordmark .wm-a, .wordmark .wm-b { animation: wmShineOnce 2.6s ease-out .6s 1 both; }
+.wordmark .wm-b { animation-delay: .9s; }
+.brand:hover .wordmark .wm-a, .brand:hover .wordmark .wm-b { animation: wmShineHover 1.6s ease-out 1 both; }
+@keyframes wmShineOnce { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+@keyframes wmShineHover { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+.wordmark .wm-a { filter: drop-shadow(0 2px 0 #66758a) drop-shadow(0 5px 6px rgba(0, 0, 0, .5)); }
+.wordmark .wm-b { filter: drop-shadow(0 2px 0 #835414) drop-shadow(0 5px 6px rgba(0, 0, 0, .5)); }
+html[data-theme='light'] .wordmark .wm-a { filter: drop-shadow(0 2px 0 #8aa0b7) drop-shadow(0 4px 6px rgba(13, 42, 60, .3)); }
+html[data-theme='light'] .wordmark .wm-b { filter: drop-shadow(0 2px 0 #835414) drop-shadow(0 4px 6px rgba(60, 35, 5, .3)); }
+/* Background photos: no endless "breathing" zoom — the camera already moves with scroll and the mouse. */
+html body .pd-breathe { animation: none !important; }
+/* Moments strip runs only while visible. */
+.marquee { animation-play-state: paused !important; }
+.marquee-scene.is-on .marquee { animation-play-state: running !important; }
+/* Panels over the moving photo backdrop: a rich tint instead of a live blur (a blur re-renders every frame the photos move). */
+html body:has(.page-dolly) .glass, html body:has(.page-dolly) main .editorial { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+html body:has(.page-dolly) .glass { background: linear-gradient(160deg, rgba(22, 38, 50, .86), rgba(9, 19, 27, .8)); }
+html[data-theme='light'] body:has(.page-dolly) .glass { background: linear-gradient(160deg, rgba(255, 255, 255, .92), rgba(240, 246, 250, .86)); }
+html body:has(.page-dolly) main .editorial { background: rgba(8, 18, 24, .78); }
+html[data-theme='light'] body:has(.page-dolly) main .editorial { background: rgba(255, 255, 255, .88); }

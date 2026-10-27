@@ -10,7 +10,7 @@ export function LogoMark({ size = 36, title }: { size?: number; title?: string }
     <span className="logo-mark logo-globe" style={{ width: size, height: size }} role={title ? 'img' : undefined} aria-hidden={title ? undefined : true} aria-label={title}>
       <span className="lg-scale" style={{ transform: `scale(${size / 64})` }}>
         <svg className="lg-orbit lg-orbit-back" viewBox="0 0 64 64" aria-hidden><path d="M2 32 A30 9.5 0 0 1 62 32" /></svg>
-        <span className="lg-earth" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}media/brand/earth.jpg)` }} />
+        <span className="lg-earth"><span className="lg-strip" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}media/brand/earth.jpg)` }} /></span>
         <span className="lg-shade" />
         <svg className="lg-orbit lg-orbit-front" viewBox="0 0 64 64" aria-hidden><path d="M62 32 A30 9.5 0 0 1 2 32" /></svg>
         <span className="lg-plane-orbit"><span className="lg-plane">✈</span></span>

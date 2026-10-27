@@ -207,10 +207,19 @@ export function PhotoRing({ items, onOpen, motion, label, subtitle }: { items: D
 /** Endless 3D marquee of real “moments” (people, wildlife, city lights). */
 export function MomentsMarquee({ ids }: { ids: string[] }) {
   const items = ids.map((id) => ({ id, img: localImages(id)[0] })).filter((x) => x.img);
+  const scene = useRef<HTMLDivElement>(null);
+  // The strip only moves while it is on screen (an endless off-screen animation still costs every frame).
+  useEffect(() => {
+    const el = scene.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => el.classList.toggle('is-on', e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   if (!items.length) return null;
   const loop = [...items, ...items];
   return (
-    <div className="marquee-scene">
+    <div ref={scene} className="marquee-scene">
       <div className="marquee" aria-hidden>
         {loop.map((m, i) => (
           <figure key={`${m.id}-${i}`} className="moment">

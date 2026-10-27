@@ -29,7 +29,7 @@ const bgSrcSet = (im: LocalImage) => (['960', '1920'] as const).filter((w) => im
 /** Small copy for the floating cards (480px when available). */
 const thumbOf = (im: LocalImage) => (im.sizes['480'] ? `${import.meta.env.BASE_URL.replace(/\/$/, '')}${im.sizes['480']}` : srcOf(im, 'card'));
 
-const FIELD_SPOTS = Array.from({ length: 18 }, (_, k) => ({ a: k * 2.39996 + 0.4, phase: (k * 0.618034) % 1, r: 0.9 + ((k * 7) % 5) * 0.12 }));
+const FIELD_SPOTS = Array.from({ length: 12 }, (_, k) => ({ a: k * 2.39996 + 0.4, phase: (k * 0.618034) % 1, r: 0.9 + ((k * 7) % 5) * 0.12 }));
 
 /**
  * `field`: photos that float in 3D around the scene and fly past the camera as you scroll (home page).
@@ -101,7 +101,7 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
         const d = (((spot.phase - cur * 0.42) % 1) + 1) % 1; // 0 = at the camera, 1 = far away
         const dist = 0.12 + d * 1.25, sc = 0.32 / dist;
         const fadeIn = Math.min(1, (1 - d) / 0.18), fadeOut = Math.min(1, Math.max(0, (dist - 0.2) / 0.22));
-        const heroCalm = hero && cur < 0.25 ? 0.55 + cur * 1.8 : 1; // a quieter field while the hero is whole
+        const heroCalm = hero ? smooth(Math.min(1, Math.max(0, (cur - 0.22) / 0.4))) : 1; // on opening only the hero photo shows; the world photos join as you scroll
         const o = Math.max(0, Math.min(1, fadeIn * fadeOut * heroCalm));
         el.style.opacity = o.toFixed(3);
         el.style.display = o < 0.01 ? 'none' : '';

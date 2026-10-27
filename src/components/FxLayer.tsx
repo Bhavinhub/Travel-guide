@@ -26,7 +26,11 @@ export function FxLayer({ fx, enabled }: { fx: Fx; enabled: boolean }) {
     const onMove = (e: PointerEvent) => { mx = e.clientX / W - 0.5; my = e.clientY / H - 0.5; };
     let alpha = 0;
     let current = fxRef.current;
-    const draw = () => {
+    let lastDraw = 0;
+    const draw = (now = performance.now()) => {
+      // Slow ambient particles look the same at 30 fps — half the work; and nothing while the 3D map is on screen.
+      if (now - lastDraw < 30 || document.documentElement.classList.contains('map-in-view')) { raf = document.hidden ? 0 : requestAnimationFrame(draw); return; }
+      lastDraw = now;
       const f = fxRef.current;
       if (f !== current) { alpha -= 0.04; if (alpha <= 0) { current = f; ps = Array.from({ length: 260 }, mk); } } else alpha = Math.min(1, alpha + 0.02);
       const v = scrollY - lastY; lastY = scrollY; sv += (v - sv) * 0.15;
