@@ -81,8 +81,19 @@ async function currentPlace(): Promise<MapOrigin> {
   return { name, lat, lon };
 }
 
+/** How the visitor travels: the route, the time and the icon moving on the map follow it. */
+export type Travel = 'auto' | 'car' | 'bike' | 'train' | 'flight' | 'walk';
+const VEHICLE: Record<Exclude<Travel, 'auto'>, { icon: string; label: string }> = {
+  car: { icon: '🚗', label: 'Car' }, bike: { icon: '🚲', label: 'Bike' }, train: { icon: '🚆', label: 'Train' },
+  flight: { icon: '✈️', label: 'Flight' }, walk: { icon: '🚶', label: 'On foot' },
+};
+
 interface Route {
   pts: [number, number][]; cum: number[]; mode: 'road' | 'air'; km: number; hours?: number;
+  /** What actually travels this route (the moving icon and the label). */
+  travel?: Exclude<Travel, 'auto'>;
+  /** Shown when the chosen way of travel isn't possible and another was used, or the line is approximate. */
+  note?: string;
   /** Where the road ends and a footpath continues (index into pts), e.g. the Kedarnath trek. */
   walkFrom?: number; walkKm?: number; walkHours?: number;
 }
@@ -124,35 +135,51 @@ function mercatorCum(pts: [number, number][]) {
 /** The gold "travelled" line: the whole route drawn once, revealed up to `t` by a gradient (no re-upload). */
 const doneGradient = (t: number) => ['step', ['line-progress'], t <= 0 ? 'rgba(244,184,96,0)' : '#f4b860', clamp(t, 0.0001, 0.9999), t >= 1 ? '#f4b860' : 'rgba(244,184,96,0)'];
 
-async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSignal): Promise<Route> {
+const toPts = (coords: [number, number][]) => coords.map(([lo, la]) => [la, lo] as [number, number]);
+const thin = (all: [number, number][]) => { const step = Math.max(1, Math.ceil(all.length / 700)); return all.filter((_, i) => i % step === 0 || i === all.length - 1); };
+async function osrm(profile: 'car' | 'bike' | 'foot', a: [number, number], b: [number, number], signal: AbortSignal) {
+  const url = profile === 'car'
+    ? `https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`
+    : `https://routing.openstreetmap.de/routed-${profile}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
+  const j = await fetch(url, { signal }).then((x) => x.json());
+  const g = j.routes?.[0];
+  return g?.geometry?.coordinates?.length > 1 ? { pts: thin(toPts(g.geometry.coordinates)), km: g.distance / 1000, hours: g.duration / 3600 } : null;
+}
+
+async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSignal, travel: Travel = 'auto'): Promise<Route> {
   const a: [number, number] = [from.lat, from.lon];
   const crow = kmBetween(a, to);
-  // Drive only for trips where a car is realistic; islands and long hauls are flown.
-  if (crow < 800) {
-    try {
-      const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to[1]},${to[0]}?overview=full&geometries=geojson`, { signal });
-      const j = await r.json();
-      const g = j.routes?.[0];
-      if (g?.geometry?.coordinates?.length > 1 && g.distance / 1000 < crow * 2.2 + 40) {
-        const all: [number, number][] = g.geometry.coordinates.map(([lo, la]: [number, number]) => [la, lo]);
-        const step = Math.max(1, Math.ceil(all.length / 700)); // keep winding mountain roads, cap the point count
-        const pts = all.filter((_, i) => i % step === 0 || i === all.length - 1);
-        // The road stops short of the place (a trek, a pilgrim path, a pedestrian old town)? Walk the rest.
-        const end = pts[pts.length - 1], gap = kmBetween(end, to);
-        if (gap > 0.6 && gap < 40) {
-          try {
-            const w = await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${end[1]},${end[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`, { signal }).then((x) => x.json());
-            const wr = w.routes?.[0];
-            const walk: [number, number][] = wr?.geometry?.coordinates?.length > 1 ? wr.geometry.coordinates.map(([lo, la]: [number, number]) => [la, lo]) : [end, to];
-            const route = buildRoute([...pts, ...walk.slice(1)], 'road', g.distance / 1000 + (wr ? wr.distance / 1000 : gap), g.duration / 3600);
-            return { ...route, walkFrom: pts.length - 1, walkKm: wr ? wr.distance / 1000 : gap, walkHours: wr ? wr.duration / 3600 : gap / 4 };
-          } catch { /* no footpath data: draw the road only */ }
-        }
-        return buildRoute(pts, 'road', g.distance / 1000, g.duration / 3600);
+  const flight = (note?: string): Route => ({ ...buildRoute(arc(a, to), 'air', crow, crow / 750 + 1.5), travel: 'flight', note });
+  if (travel === 'flight') return flight();
+  // Walking or cycling a very long way isn't realistic — use the road instead and say so.
+  let want: Exclude<Travel, 'auto' | 'flight'> = travel === 'auto' ? 'car' : travel;
+  let note: string | undefined;
+  if (want === 'walk' && crow > 150) { want = 'car'; note = 'Too far to walk — shown by road'; }
+  if (want === 'bike' && crow > 600) { want = 'car'; note = 'Too far to cycle — shown by road'; }
+  if (travel === 'auto' && crow >= 800) return flight();
+  if (want !== 'train' && crow > 2500) return flight('Too far overland — shown as a flight');
+  try {
+    const profile = want === 'walk' ? 'foot' : want === 'bike' ? 'bike' : 'car';
+    const g = await osrm(profile, a, to, signal);
+    if (g && g.km < crow * 2.2 + 40) {
+      // Trains: no open rail routing exists — follow the main road corridor and use typical train timing.
+      const hours = want === 'train' ? g.km / 55 + 0.5 : g.hours;
+      if (want === 'train') note = note ?? 'Approximate line along the main corridor';
+      const base = { ...buildRoute(g.pts, 'road', g.km, hours), travel: want, note } as Route;
+      // The road stops short of the place (a trek, a pilgrim path, a pedestrian old town)? Walk the rest.
+      const end = g.pts[g.pts.length - 1], gap = kmBetween(end, to);
+      if (want !== 'walk' && gap > 0.6 && gap < 40) {
+        try {
+          const w = await osrm('foot', end, to, signal);
+          const walk = w?.pts ?? [end, to];
+          const route = buildRoute([...g.pts, ...walk.slice(1)], 'road', g.km + (w ? w.km : gap), hours);
+          return { ...route, travel: want, note, walkFrom: g.pts.length - 1, walkKm: w ? w.km : gap, walkHours: w ? w.hours : gap / 4 };
+        } catch { /* no footpath data: draw the route only */ }
       }
-    } catch { /* fall back to a straight arc */ }
-  }
-  return buildRoute(arc(a, to), 'air', crow);
+      return base;
+    }
+  } catch { /* fall back to a flight arc */ }
+  return flight(travel === 'auto' ? undefined : 'No route found — shown as a flight');
 }
 
 export interface RouteStop extends NearbySpot { frac: number; kmFromStart: number }
@@ -233,6 +260,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const [card, setCard] = useState(-1);
   const cardRef = useRef(-1);
   const [mode, setMode] = useState<'satellite' | 'street'>('satellite');
+  const [travel, setTravel] = useState<Travel>('auto');
   const [free, setFree] = useState(false);
   const freeRef = useRef(false);
   freeRef.current = free;
@@ -308,15 +336,32 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           satellite: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
           labels: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18 },
           street: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors' },
+          // Names on the ground — cafés, restaurants, sights, streets, neighbourhoods (OpenStreetMap via OpenFreeMap).
+          names: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: '© OpenStreetMap contributors' },
           dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Elevation: AWS Terrain Tiles' },
           route: { type: 'geojson', lineMetrics: true, data: { type: 'FeatureCollection', features: [] } },
           walk: { type: 'geojson', lineMetrics: true, data: { type: 'FeatureCollection', features: [] } },
         },
+        glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
         layers: [
           { id: 'base', type: 'raster', source: 'base' }, // coarse imagery under the sharp layer: no holes while tiles stream in
           { id: 'satellite', type: 'raster', source: 'satellite' },
           { id: 'street', type: 'raster', source: 'street', layout: { visibility: 'none' } },
           { id: 'labels', type: 'raster', source: 'labels' },
+          { id: 'area-names', type: 'symbol', source: 'names', 'source-layer': 'place', minzoom: 11.5,
+            filter: ['in', ['get', 'class'], ['literal', ['suburb', 'neighbourhood', 'quarter', 'village', 'hamlet', 'locality']]],
+            layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']] as maplibregl.ExpressionSpecification, 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-letter-spacing': 0.04, 'text-max-width': 9 },
+            paint: { 'text-color': '#fdf6e3', 'text-halo-color': 'rgba(0,0,0,.85)', 'text-halo-width': 1.6 } },
+          { id: 'street-names', type: 'symbol', source: 'names', 'source-layer': 'transportation_name', minzoom: 14,
+            layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']] as maplibregl.ExpressionSpecification, 'text-font': ['Noto Sans Regular'], 'text-size': 11 },
+            paint: { 'text-color': '#f1efe6', 'text-halo-color': 'rgba(0,0,0,.8)', 'text-halo-width': 1.3 } },
+          { id: 'poi-dots', type: 'circle', source: 'names', 'source-layer': 'poi', minzoom: 13.5, filter: ['has', 'name'],
+            paint: { 'circle-radius': 3.2, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#fff',
+              'circle-color': ['match', ['get', 'class'], ['cafe', 'restaurant', 'fast_food', 'bar', 'beer', 'ice_cream'], '#f59e42', ['lodging'], '#5aa7ff', ['place_of_worship', 'attraction', 'museum', 'monument', 'castle'], '#f4c84a', ['park', 'garden'], '#5fd18b', '#e7e7e7'] } },
+          { id: 'poi-names', type: 'symbol', source: 'names', 'source-layer': 'poi', minzoom: 13.5, filter: ['has', 'name'],
+            layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']] as maplibregl.ExpressionSpecification, 'text-font': ['Noto Sans Regular'], 'text-size': 11.5,
+              'text-anchor': 'top', 'text-offset': [0, 0.55], 'text-max-width': 8, 'symbol-sort-key': ['get', 'rank'] },
+            paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,.85)', 'text-halo-width': 1.4 } },
           { id: 'route-glow', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.25, 'line-blur': 4 } },
           { id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 2.5, 'line-opacity': 0.85 } },
           { id: 'walk-glow', type: 'line', source: 'walk', paint: { 'line-color': '#7be0a8', 'line-width': 7, 'line-opacity': 0.3, 'line-blur': 3 } },
@@ -392,6 +437,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     const apply = () => {
       m.setLayoutProperty('satellite', 'visibility', mode === 'satellite' ? 'visible' : 'none');
       m.setLayoutProperty('labels', 'visibility', mode === 'satellite' ? 'visible' : 'none');
+      ['area-names', 'street-names', 'poi-dots', 'poi-names'].forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, 'visibility', mode === 'satellite' ? 'visible' : 'none'));
       m.setLayoutProperty('street', 'visibility', mode === 'street' ? 'visible' : 'none');
     };
     if (m.isStyleLoaded()) apply(); else m.once('load', apply);
@@ -425,7 +471,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     if (!from) return;
     const ctl = new AbortController();
     const markers: Marker[] = [];
-    fetchRoute(from, [lat, lon], ctl.signal).then((r) => {
+    fetchRoute(from, [lat, lon], ctl.signal, travel).then((r) => {
       const m = map.current;
       if (ctl.signal.aborted || !m) return;
       const draw = () => {
@@ -449,7 +495,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         markers.push(new maplibregl.Marker({ element: o }).setLngLat([from.lon, from.lat]).addTo(m));
         const mv = document.createElement('div');
         mv.className = 'map-mover';
-        mv.textContent = r.mode === 'air' ? '✈️' : '🚗';
+        mv.textContent = VEHICLE[r.travel ?? (r.mode === 'air' ? 'flight' : 'car')].icon;
         mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
         markers.push(mover.current);
         doneState.current = { n: -1, t: -1 };
@@ -489,7 +535,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       if (m?.getSource('walk')) (m.getSource('walk') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromKey, lat, lon, near]);
+  }, [fromKey, lat, lon, near, travel]);
 
   /** The 3D camera for journey progress p (0 = whole Earth, 1 = landed at the place). */
   const applyCamera = (p: number) => {
@@ -529,7 +575,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const f = travelToDistance(rr.r, smooth(t)); // the walking stretch takes longer than its length
         const walking = isWalking(rr.r, f);
         const mv = mover.current?.getElement();
-        if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : rr.r.mode === 'air' ? '✈️' : '🚗'; }
+        if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : VEHICLE[rr.r.travel ?? (rr.r.mode === 'air' ? 'flight' : 'car')].icon; }
         const at = along(rr.r, f), pt = at.p;
         const ahead = along(rr.r, Math.min(1, f + 0.04)).p;
         center = [lerp(rr.fit.center[0], pt[1], e), lerp(rr.fit.center[1], pt[0], e)];
@@ -557,9 +603,9 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       } else {
         // Arrive: dolly in and orbit down onto the place.
         const e = smooth((p - 0.85) / 0.15);
-        center = [lon, lat]; zoom = lerp(follow, zoomTo, e); pitch = lerp(52, 50, e); bearing = lerp(0, -20, e);
+        // Close enough to see the place itself, high enough to read the cafés, sights and streets around it.
+        center = [lon, lat]; zoom = lerp(follow, Math.min(zoomTo, 15.4), e); pitch = lerp(52, 50, e); bearing = lerp(0, -20, e);
         setDone('end'); mover.current?.setLngLat([lon, lat]);
-        mover.current?.getElement().classList.toggle('is-arrived', e > 0.6);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       }
     }
@@ -741,7 +787,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
 
   const hm = (h = 0) => `${Math.floor(h)} h ${Math.round((h % 1) * 60)} min`;
   const routeLabel = route && from
-    ? `${route.mode === 'air' ? '✈️ Flight' : '🚗 Road'} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · ${hm(route.hours)}` : ''}${route.walkKm ? `  ·  🥾 Trek ${route.walkKm.toFixed(1)} km · ${hm(route.walkHours)}` : ''}`
+    ? `${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].icon} ${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].label} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · ${hm(route.hours)}` : ''}${route.walkKm ? `  ·  🥾 Trek ${route.walkKm.toFixed(1)} km · ${hm(route.walkHours)}` : ''}${route.note ? `  ·  ${route.note}` : ''}`
     : null;
 
   return (
@@ -776,6 +822,12 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           </button>
           {menuOpen && (
             <div className="mf-options" role="menu" aria-label="Map options">
+              <div className="mf-travel" role="group" aria-label="How you travel">
+                {(['car', 'bike', 'train', 'flight', 'walk'] as const).map((t) => {
+                  const on = (route?.travel ?? (travel === 'auto' ? null : travel)) === t;
+                  return <button key={t} role="menuitemradio" aria-checked={on} className={`mf-travel-btn${on ? ' is-on' : ''}`} title={VEHICLE[t].label} onClick={() => { autoplay.current = true; setTravel(t); setMenuOpen(false); }}><span aria-hidden>{VEHICLE[t].icon}</span><small>{t === 'walk' ? 'Walk' : VEHICLE[t].label}</small></button>;
+                })}
+              </div>
               <button role="menuitem" className="mf-opt is-primary" onClick={() => { setMenuOpen(false); (playing ? stop : play)(); }}>{playing ? '■ Stop journey' : '▶ Play journey'}</button>
               <div className="mf-opt-row" role="group" aria-label="Map type">
                 <button role="menuitemradio" aria-checked={mode === 'satellite'} className={`mf-opt-half${mode === 'satellite' ? ' is-on' : ''}`} onClick={() => setMode('satellite')}>Satellite</button>

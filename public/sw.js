@@ -5,14 +5,14 @@
  *   (or saved with "Save offline") still shows without a connection.
  * - Live data (Wikipedia, weather, routes): network first, last good answer when offline.
  */
-const VERSION = 'tg-v1';
+const VERSION = 'tg-v2';
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const TILES = `${VERSION}-tiles`;
 const DATA = `${VERSION}-data`;
 const MAX_TILES = 6000;
 
-const TILE_HOSTS = ['server.arcgisonline.com', 'tile.openstreetmap.org', 's3.amazonaws.com'];
+const TILE_HOSTS = ['server.arcgisonline.com', 'tile.openstreetmap.org', 's3.amazonaws.com', 'tiles.openfreemap.org'];
 const DATA_HOSTS = ['en.wikipedia.org', 'commons.wikimedia.org', 'api.open-meteo.com', 'geocoding-api.open-meteo.com', 'router.project-osrm.org', 'routing.openstreetmap.de', 'api.frankfurter.dev'];
 const IMAGE_HOSTS = ['upload.wikimedia.org', 'thumb.wikimedia.org'];
 
@@ -73,6 +73,8 @@ self.addEventListener('fetch', (e) => {
     }
     return;
   }
+  // The label index (which dated tile set is current) must stay fresh; the tiles themselves never change.
+  if (url.host === 'tiles.openfreemap.org' && !/\.pbf$/.test(url.pathname)) { e.respondWith(networkFirst(req, DATA)); return; }
   if (TILE_HOSTS.includes(url.host)) { e.respondWith(cacheFirst(req, TILES, true)); return; }
   if (IMAGE_HOSTS.includes(url.host)) { e.respondWith(cacheFirst(req, STATIC)); return; }
   if (DATA_HOSTS.includes(url.host)) { e.respondWith(networkFirst(req, DATA)); }

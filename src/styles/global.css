@@ -1554,3 +1554,14 @@ html[data-theme='light'] .mf-opt-half { color: #2b3f4b; }
 html body .mapfly .mapfly-card { bottom: 4.2rem; top: auto; }
 /* Keep the imagery credit readable: it sits bottom-right, clear of the options button. */
 .mapfly .maplibregl-ctrl-bottom-right { z-index: 3; }
+
+/* Map options: how you travel (car, bike, train, flight, walk). */
+.mf-travel { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.06); }
+.mf-travel-btn { all: unset; cursor: pointer; display: grid; justify-items: center; gap: 1px; padding: .35rem 0; border-radius: 9px; color: #c9d6dc; }
+.mf-travel-btn span { font-size: 1.15rem; line-height: 1.1; }
+.mf-travel-btn small { font-size: .66rem; font-weight: 600; }
+.mf-travel-btn:hover, .mf-travel-btn:focus-visible { background: rgba(244,184,96,.16); }
+.mf-travel-btn.is-on { background: linear-gradient(160deg, #ffe2a8, #f4b860); color: #10202a; }
+html[data-theme='light'] .mf-travel { background: rgba(13,42,34,.06); }
+html[data-theme='light'] .mf-travel-btn { color: #2b3f4b; }
+html body .map-mover.is-arrived { visibility: visible; }
