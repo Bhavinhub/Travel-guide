@@ -1,26 +1,21 @@
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import maplibregl, { type Map as MLMap, type Marker } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
-import { nearbySpots, placeHref, SACRED_OR_SCENIC, type NearbySpot } from '../lib/places';
+import { nearbySpots, placeHref, SCENIC_STOP, type NearbySpot } from '../lib/places';
 import { href, navigate } from '../lib/router';
 import { useMotion } from '../lib/store';
 
 /**
- * Satellite map with a scroll-controlled 3D camera that travels the route.
- * Scrolling down: orbit → whole route in view → the camera follows the path from the
- * starting city (road route from OSRM, or a flight arc for long distances) → it lands and
- * zooms into the place with a 3D tilt. Scrolling up reverses every step.
- * "Explore map" frees the map with zoom buttons, wheel/pinch zoom and dragging.
- * Imagery: Esri World Imagery; street map: OpenStreetMap; road routes: OSRM.
+ * Scroll-controlled 3D Earth journey.
+ * The scene opens on the whole planet (a real globe with atmosphere). Scrolling down dollies the
+ * camera in: the route from the starting city is drawn, the camera tilts and follows the road
+ * (or flight arc) over 3D terrain, scenic stops pop up as postcards, and it lands on the place.
+ * Scrolling up dollies back out to the globe. Tap the pin or "Play journey" to watch it on its own;
+ * "Explore map" frees the camera (drag, zoom, rotate, tilt).
+ * Imagery: Esri World Imagery · Street map: OpenStreetMap · Elevation: AWS Terrain Tiles · Routes: OSRM.
  */
 export interface MapSpot { name: string; lat: number; lon: number; href?: string }
 export interface MapOrigin { name: string; lat: number; lon: number }
-
-const LAYERS = {
-  satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxZoom: 18 },
-  labels: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', attribution: '', maxZoom: 18 },
-  street: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap contributors', maxZoom: 19 },
-};
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -90,11 +85,12 @@ export interface RouteStop extends NearbySpot { frac: number; kmFromStart: numbe
 /** Beautiful places along the way: sample the route and pick the most scenic photographed spot near each sample. */
 async function scenicStops(r: Route, from: MapOrigin, to: [number, number], signal: AbortSignal): Promise<RouteStop[]> {
   const total = r.cum[r.cum.length - 1];
-  const samples = (r.mode === 'air' ? [] : [0.12, 0.25, 0.38, 0.5, 0.62, 0.75, 0.88]).map((f) => along(r, f).p);
+  const samples = (r.mode === 'air' ? [] : [0.1, 0.19, 0.28, 0.37, 0.46, 0.55, 0.64, 0.73, 0.82, 0.91]).map((f) => along(r, f).p);
   const found = await Promise.all(samples.map((p) => nearbySpots(p[0], p[1], signal).catch(() => [] as NearbySpot[])));
   const out: RouteStop[] = [];
   found.forEach((list) => {
-    const pick = list.filter((s) => s.image).sort((a, b) => Number(SACRED_OR_SCENIC.test(`${b.title} ${b.description ?? ''}`)) - Number(SACRED_OR_SCENIC.test(`${a.title} ${a.description ?? ''}`)))[0];
+    // Only real sights with a photo: temples, lakes, rivers, falls, forts, viewpoints…
+    const pick = list.find((s) => s.image && SCENIC_STOP.test(`${s.title} ${s.description ?? ''}`));
     if (!pick || out.some((o) => o.title === pick.title)) return;
     if (kmBetween([pick.lat, pick.lon], [from.lat, from.lon]) < 20 || kmBetween([pick.lat, pick.lon], to) < 4) return;
     // Where on the route this stop sits.
@@ -107,14 +103,12 @@ async function scenicStops(r: Route, from: MapOrigin, to: [number, number], sign
 
 export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { lat: number; lon: number; name: string; spots?: MapSpot[]; zoomTo?: number; from?: MapOrigin }) {
   const sec = useRef<HTMLElement>(null);
-  const stage = useRef<HTMLDivElement>(null);
   const el = useRef<HTMLDivElement>(null);
-  const map = useRef<L.Map | null>(null);
-  const base = useRef<L.TileLayer | null>(null);
-  const labels = useRef<L.TileLayer | null>(null);
-  const backdrop = useRef<L.TileLayer | null>(null);
-  const spotLayer = useRef<L.LayerGroup | null>(null);
-  const routeRef = useRef<{ r: Route; group: L.LayerGroup; done: L.Polyline; mover: L.Marker; fitZoom: number; center: L.LatLng } | null>(null);
+  const map = useRef<MLMap | null>(null);
+  const ready = useRef(false);
+  const mover = useRef<Marker | null>(null);
+  const spotMarkers = useRef<Marker[]>([]);
+  const routeRef = useRef<{ r: Route; fit: { center: [number, number]; zoom: number } } | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
   const [stops, setStops] = useState<RouteStop[]>([]);
   const stopsRef = useRef<RouteStop[]>([]);
@@ -123,153 +117,223 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
   const [mode, setMode] = useState<'satellite' | 'street'>('satellite');
   const [free, setFree] = useState(false);
   const freeRef = useRef(false);
+  freeRef.current = free;
   const [playing, setPlaying] = useState(false);
   const playRef = useRef(false);
-  freeRef.current = free;
   const { reduced } = useMotion();
   const fromKey = from ? `${from.name}|${from.lat},${from.lon}` : '';
+  const kick = useRef<() => void>(() => undefined);
 
+  // ── Create the globe ──
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, attributionControl: true, zoomSnap: 0, zoomDelta: 1, wheelPxPerZoomLevel: 90, scrollWheelZoom: false, dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, worldCopyJump: true });
-    m.setView([lat, lon], reduced ? zoomTo : 2.4);
-    labels.current = L.tileLayer(LAYERS.labels.url, { maxZoom: 18, pane: 'overlayPane' }).addTo(m);
-    const icon = L.divIcon({ className: 'map-pin', html: `<span class="pulse"></span><span class="dot"></span><b>${esc(name)}</b>`, iconSize: [0, 0] });
-    L.marker([lat, lon], { icon, keyboard: false, zIndexOffset: 1000, title: `Play the journey to ${name}` }).addTo(m).on('click', () => playFn.current());
-    spotLayer.current = L.layerGroup().addTo(m);
+    const m = new maplibregl.Map({
+      container: el.current!,
+      center: [lon, lat],
+      zoom: reduced ? zoomTo : 0.9,
+      pitch: 0,
+      maxPitch: 80,
+      attributionControl: { compact: true },
+      interactive: true,
+      style: {
+        version: 8,
+        projection: { type: 'globe' },
+        sources: {
+          satellite: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
+          labels: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18 },
+          street: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors' },
+          dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Elevation: AWS Terrain Tiles' },
+          route: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+          done: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        },
+        layers: [
+          { id: 'satellite', type: 'raster', source: 'satellite' },
+          { id: 'street', type: 'raster', source: 'street', layout: { visibility: 'none' } },
+          { id: 'labels', type: 'raster', source: 'labels' },
+          { id: 'route-glow', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.25, 'line-blur': 4 } },
+          { id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 2.5, 'line-opacity': 0.85 } },
+          { id: 'done', type: 'line', source: 'done', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f4b860', 'line-width': 5 } },
+        ],
+        terrain: { source: 'dem', exaggeration: 1.4 },
+        sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 8, 0] },
+      },
+    });
+    // The camera is driven by scroll until the visitor chooses "Explore map".
+    [m.scrollZoom, m.dragPan, m.dragRotate, m.doubleClickZoom, m.touchZoomRotate, m.keyboard, m.boxZoom, m.touchPitch].forEach((h) => h.disable());
+    const pin = document.createElement('div');
+    pin.className = 'map-pin';
+    pin.innerHTML = `<span class="pulse"></span><span class="dot"></span><b>${esc(name)}</b>`;
+    pin.title = `Play the journey to ${name}`;
+    pin.addEventListener('click', () => playFn.current());
+    new maplibregl.Marker({ element: pin }).setLngLat([lon, lat]).addTo(m);
+    m.on('load', () => { ready.current = true; kick.current(); });
     map.current = m;
-    return () => { m.remove(); map.current = null; routeRef.current = null; };
+    return () => { ready.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lon, name]);
 
-  // Nearby places as small markers (they arrive after the map is created).
+  // Satellite / street map.
   useEffect(() => {
-    const g = spotLayer.current;
-    if (!g) return;
-    g.clearLayers();
-    spots.slice(0, 12).forEach((s) => {
-      const mk = L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'map-spot', html: '<span></span>', iconSize: [12, 12] }), keyboard: false, title: s.name }).addTo(g);
-      mk.bindTooltip(s.name, { direction: 'top', offset: [0, -6] });
-      if (s.href) mk.on('click', () => window.open(s.href, '_blank', 'noopener'));
+    const m = map.current;
+    if (!m) return;
+    const apply = () => {
+      m.setLayoutProperty('satellite', 'visibility', mode === 'satellite' ? 'visible' : 'none');
+      m.setLayoutProperty('labels', 'visibility', mode === 'satellite' ? 'visible' : 'none');
+      m.setLayoutProperty('street', 'visibility', mode === 'street' ? 'visible' : 'none');
+    };
+    if (m.isStyleLoaded()) apply(); else m.once('load', apply);
+  }, [mode]);
+
+  // Nearby places as small markers.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    spotMarkers.current.forEach((k) => k.remove());
+    spotMarkers.current = spots.slice(0, 12).map((s) => {
+      const d = document.createElement('div');
+      d.className = 'map-spot';
+      d.title = s.name;
+      d.innerHTML = '<span></span>';
+      if (s.href) d.addEventListener('click', () => window.open(s.href, '_blank', 'noopener'));
+      return new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(m);
     });
   }, [spots, lat, lon]);
 
-  // Fetch and draw the route from the starting city.
+  // ── Route from the starting city, and scenic stops along it ──
   useEffect(() => {
     if (!from) return;
     const ctl = new AbortController();
+    const markers: Marker[] = [];
     fetchRoute(from, [lat, lon], ctl.signal).then((r) => {
       const m = map.current;
       if (ctl.signal.aborted || !m) return;
-      const group = L.layerGroup().addTo(m);
-      const full = L.polyline(r.pts, { color: '#ffffff', weight: 3, opacity: 0.6, dashArray: r.mode === 'air' ? '6 8' : undefined }).addTo(group);
-      const done = L.polyline([], { color: '#f4b860', weight: 5, opacity: 0.95 }).addTo(group);
-      L.marker(r.pts[0], { icon: L.divIcon({ className: 'map-origin', html: `<span></span><b>${esc(from.name)}</b>`, iconSize: [0, 0] }), keyboard: false }).addTo(group);
-      const mover = L.marker(r.pts[0], { icon: L.divIcon({ className: 'map-mover', html: r.mode === 'air' ? '✈' : '🚗', iconSize: [30, 30] }), keyboard: false, zIndexOffset: 900 }).addTo(group);
-      const bounds = full.getBounds();
-      const fitZoom = Math.min(zoomTo - 1.5, m.getBoundsZoom(bounds.pad(0.75), false));
-      routeRef.current = { r, group, done, mover, fitZoom, center: bounds.getCenter() };
-      setRoute(r);
-      dispatchEvent(new Event('scroll'));
+      const draw = () => {
+        (m.getSource('route') as maplibregl.GeoJSONSource).setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: r.pts.map(([a, b]) => [b, a]) } });
+        if (r.mode === 'air') m.setPaintProperty('route', 'line-dasharray', [2, 2]);
+        const lngs = r.pts.map((p) => p[1]), lats = r.pts.map((p) => p[0]);
+        const cam = m.cameraForBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 70 });
+        const c = cam?.center as maplibregl.LngLat | undefined;
+        routeRef.current = { r, fit: { center: c ? [c.lng, c.lat] : [(lon + from.lon) / 2, (lat + from.lat) / 2], zoom: Math.min(zoomTo - 2, cam?.zoom ?? 5) } };
+        const o = document.createElement('div');
+        o.className = 'map-origin';
+        o.innerHTML = `<span></span><b>${esc(from.name)}</b>`;
+        markers.push(new maplibregl.Marker({ element: o }).setLngLat([from.lon, from.lat]).addTo(m));
+        const mv = document.createElement('div');
+        mv.className = 'map-mover';
+        mv.textContent = r.mode === 'air' ? '✈' : '🚗';
+        mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
+        markers.push(mover.current);
+        setRoute(r);
+        kick.current();
+      };
+      if (m.isStyleLoaded()) draw(); else m.once('load', draw);
       scenicStops(r, from, [lat, lon], ctl.signal).then((st) => {
-        if (ctl.signal.aborted) return;
+        if (ctl.signal.aborted || !map.current) return;
         stopsRef.current = st; setStops(st);
         st.forEach((s, i) => {
-          L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'map-photo', html: `<img src="${esc(s.image ?? '')}" alt="" referrerpolicy="no-referrer"><b>${esc(s.title)}</b>`, iconSize: [46, 46], iconAnchor: [23, 23] }), keyboard: false, zIndexOffset: 800 })
-            .addTo(group).on('click', () => { cardRef.current = i; setCard(i); });
+          const d = document.createElement('div');
+          d.className = 'map-photo';
+          d.innerHTML = `<img src="${esc(s.image ?? '')}" alt="" referrerpolicy="no-referrer"><b>${esc(s.title)}</b>`;
+          d.addEventListener('click', () => { cardRef.current = i; setCard(i); });
+          markers.push(new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(map.current!));
         });
       });
     });
     return () => {
       ctl.abort();
-      routeRef.current?.group.remove();
-      routeRef.current = null;
-      setRoute(null);
-      stopsRef.current = []; setStops([]); cardRef.current = -1; setCard(-1);
+      markers.forEach((k) => k.remove());
+      routeRef.current = null; mover.current = null;
+      setRoute(null); stopsRef.current = []; setStops([]); cardRef.current = -1; setCard(-1);
+      const m = map.current;
+      if (m?.getSource('route')) (m.getSource('route') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromKey, lat, lon]);
 
-  useEffect(() => {
-    const m = map.current;
-    if (!m) return;
-    base.current?.remove();
-    const cfg = LAYERS[mode];
-    base.current = L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, attribution: cfg.attribution, keepBuffer: 4, updateInterval: 120 }).addTo(m);
-    base.current.bringToBack();
-    // Low-detail imagery underneath (few, quickly cached tiles) so the camera never flies over grey while sharp tiles load.
-    backdrop.current?.remove();
-    backdrop.current = L.tileLayer(cfg.url, { maxZoom: 19, maxNativeZoom: 6, keepBuffer: 6 }).addTo(m);
-    backdrop.current.bringToBack();
-    if (mode === 'satellite') labels.current?.addTo(m); else labels.current?.remove();
-  }, [mode, lat, lon]);
-
-  /** Camera for journey progress p (0 = orbit, 1 = landed at the place). */
+  /** The 3D camera for journey progress p (0 = whole Earth, 1 = landed at the place). */
   const applyCamera = (p: number) => {
     const m = map.current;
-    if (!m) return;
+    if (!m || !ready.current) return;
     const rr = routeRef.current;
-    let center: [number, number], zoom: number, tilt: number;
+    const setDone = (coords: [number, number][]) => (m.getSource('done') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords.map(([a, b]) => [b, a]) } });
+    let center: [number, number], zoom: number, pitch: number, bearing = 0;
     if (!rr) {
       const e = smooth(p);
-      center = [lat, lon]; zoom = lerp(2.4, zoomTo, e); tilt = e;
+      center = [lon, lat]; zoom = lerp(0.9, zoomTo, e); pitch = lerp(0, 62, smooth(clamp((p - 0.45) / 0.55)));
+      bearing = lerp(0, -25, e);
     } else {
-      const follow = Math.max(rr.fitZoom, Math.min(rr.fitZoom + 1.4, 10.5, zoomTo - 1)); // close enough to see the land, wide enough to see where you are
-      const c: [number, number] = [rr.center.lat, rr.center.lng];
-      if (p < 0.15) {
-        // Orbit → the whole route in view.
-        const e = smooth(p / 0.15);
-        center = [lerp(lat, c[0], e), lerp(lon, c[1], e)]; zoom = lerp(2.4, rr.fitZoom, e); tilt = 0;
-        rr.done.setLatLngs([]); rr.mover.setLatLng(rr.r.pts[0]);
+      const follow = Math.max(rr.fit.zoom, Math.min(rr.fit.zoom + 1.6, 11, zoomTo - 1));
+      if (p < 0.18) {
+        // Whole Earth → the route region, spinning the globe towards it.
+        const e = smooth(p / 0.18);
+        center = [lerp(rr.fit.center[0] - 40, rr.fit.center[0], e), lerp(rr.fit.center[1] - 10, rr.fit.center[1], e)];
+        zoom = lerp(0.9, rr.fit.zoom, e); pitch = lerp(0, 20, e);
+        setDone([]); mover.current?.setLngLat([rr.r.pts[0][1], rr.r.pts[0][0]]);
       } else if (p < 0.85) {
-        // Travel the path: the camera rides along it.
-        const t = (p - 0.15) / 0.7, e = smooth(clamp(t * 5));
-        const { p: pt, i } = along(rr.r, smooth(t));
-        center = [lerp(c[0], pt[0], e), lerp(c[1], pt[1], e)];
-        zoom = lerp(rr.fitZoom, follow, e); tilt = 0.55 * e;
-        rr.done.setLatLngs([...rr.r.pts.slice(0, i), pt]);
-        rr.mover.setLatLng(pt);
-        // Postcard of the beautiful place the journey is passing right now.
-        const frac = smooth(t);
-        const near = stopsRef.current.findIndex((st) => Math.abs(st.frac - frac) < 0.065);
+        // Follow the road / flight over 3D terrain, looking ahead along the route.
+        const t = (p - 0.18) / 0.67, e = smooth(clamp(t * 5));
+        const f = smooth(t);
+        const { p: pt, i } = along(rr.r, f);
+        const ahead = along(rr.r, Math.min(1, f + 0.04)).p;
+        center = [lerp(rr.fit.center[0], pt[1], e), lerp(rr.fit.center[1], pt[0], e)];
+        zoom = lerp(rr.fit.zoom, follow, e); pitch = lerp(20, 58, e);
+        bearing = e * (Math.atan2(ahead[1] - pt[1], ahead[0] - pt[0]) * 180 / Math.PI) * 0.5;
+        setDone([...rr.r.pts.slice(0, i), pt]); mover.current?.setLngLat([pt[1], pt[0]]);
+        const near = stopsRef.current.findIndex((st) => Math.abs(st.frac - f) < 0.065);
         if (near !== cardRef.current) { cardRef.current = near; setCard(near); }
       } else {
-        // Arrive and descend into the place.
+        // Arrive: dolly in and orbit down onto the place.
         const e = smooth((p - 0.85) / 0.15);
-        center = [lat, lon]; zoom = lerp(follow, zoomTo, e); tilt = lerp(0.55, 1, e);
+        center = [lon, lat]; zoom = lerp(follow, zoomTo, e); pitch = lerp(58, 68, e); bearing = lerp(0, -30, e);
+        setDone(rr.r.pts); mover.current?.setLngLat([lon, lat]);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
-        rr.done.setLatLngs(rr.r.pts); rr.mover.setLatLng([lat, lon]);
       }
     }
-    m.setView(center, zoom, { animate: false });
-    stage.current?.style.setProperty('--p', tilt.toFixed(4));
+    m.jumpTo({ center, zoom, pitch, bearing });
   };
   const camRef = useRef(applyCamera);
   camRef.current = applyCamera;
 
-  // Scroll-scrubbed camera (paused while free-exploring or auto-playing).
+  // ── Scroll-controlled dolly: scroll sets a target, the camera glides to it (in and out). ──
   useEffect(() => {
     if (reduced) return;
-    let raf = 0;
-    const update = () => {
-      raf = 0;
+    let raf = 0, cur = -1, target = 0, last = 0;
+    const read = () => {
       const s = sec.current;
-      if (!s || freeRef.current || playRef.current) return;
+      if (!s) return;
       const rect = s.getBoundingClientRect();
-      camRef.current(clamp(-rect.top / Math.max(1, rect.height - innerHeight)));
+      target = clamp(-rect.top / Math.max(1, rect.height - innerHeight));
     };
-    const on = () => { if (!raf) raf = requestAnimationFrame(update); };
-    update();
+    const frame = (now: number) => {
+      raf = 0;
+      if (freeRef.current || playRef.current) { cur = -1; return; }
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+      last = now;
+      cur = cur < 0 ? target : cur + (target - cur) * (1 - Math.exp(-dt * 5));
+      if (Math.abs(target - cur) < 0.0004) cur = target;
+      camRef.current(cur);
+      if (cur !== target) raf = requestAnimationFrame(frame); else last = 0;
+    };
+    const on = () => { read(); if (!raf) raf = requestAnimationFrame(frame); };
+    kick.current = () => { cur = -1; on(); };
+    on();
     addEventListener('scroll', on, { passive: true });
     addEventListener('resize', on);
     return () => { removeEventListener('scroll', on); removeEventListener('resize', on); cancelAnimationFrame(raf); };
   }, [lat, lon, zoomTo, reduced]);
 
-  /** Click the pin (or "Play journey"): the camera travels the whole path on its own. */
+  const setInteractive = (on: boolean) => {
+    const m = map.current;
+    if (!m) return;
+    [m.scrollZoom, m.dragPan, m.dragRotate, m.doubleClickZoom, m.touchZoomRotate, m.keyboard, m.boxZoom, m.touchPitch].forEach((h) => (on ? h.enable() : h.disable()));
+  };
+  useEffect(() => { if (reduced) setInteractive(true); }, [reduced, lat, lon]);
+
+  /** Tap the pin (or "Play journey"): the camera flies the whole journey on its own, from the Earth down. */
   const play = () => {
     if (playRef.current || !map.current) return;
     if (free) { setFree(false); setInteractive(false); }
     setPlaying(true); playRef.current = true;
-    const dur = routeRef.current ? 9000 : 4500, t0 = performance.now();
+    const dur = routeRef.current ? 14000 : 6000, t0 = performance.now();
     const step = (now: number) => {
       if (!playRef.current) return;
       const p = clamp((now - t0) / dur);
@@ -281,14 +345,7 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
   };
   const playFn = useRef(play);
   playFn.current = play;
-  const stop = () => { playRef.current = false; setPlaying(false); dispatchEvent(new Event('scroll')); };
-
-  const setInteractive = (on: boolean) => {
-    const m = map.current;
-    if (!m) return;
-    [m.dragging, m.scrollWheelZoom, m.doubleClickZoom, m.touchZoom, m.boxZoom, m.keyboard].forEach((f) => (on ? f.enable() : f.disable()));
-  };
-  useEffect(() => { if (reduced) setInteractive(true); }, [reduced, lat, lon]);
+  const stop = () => { playRef.current = false; setPlaying(false); kick.current(); };
 
   const toggleFree = () => {
     const m = map.current;
@@ -296,12 +353,10 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
     const next = !free;
     setFree(next);
     setInteractive(next);
-    if (next) {
-      stage.current?.style.setProperty('--p', '0');
-      setTimeout(() => { m.invalidateSize(); if (m.getZoom() < 9) m.flyTo([lat, lon], zoomTo, { duration: 1.4 }); }, 60);
-    } else setTimeout(() => { m.invalidateSize(); dispatchEvent(new Event('scroll')); }, 60);
+    if (next) m.easeTo({ center: [lon, lat], zoom: Math.max(m.getZoom(), zoomTo - 1), pitch: 60, duration: 1600 });
+    else kick.current();
   };
-  const zoomBy = (d: number) => { const m = map.current; if (m) m.setZoom(Math.round(m.getZoom()) + d); };
+  const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
 
   const routeLabel = route && from
     ? `${route.mode === 'air' ? '✈ By air' : '🚗 By road'} from ${from.name} · ${Math.round(route.km).toLocaleString('en-IN')} km${route.hours ? ` · about ${Math.floor(route.hours)} h ${Math.round((route.hours % 1) * 60)} min` : ''}`
@@ -309,11 +364,9 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
 
   return (
     <>
-    <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}`} aria-label={`Satellite map of ${name}`}>
+    <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}`} aria-label={`3D map journey to ${name}`}>
       <div className="mapfly-sticky">
-        <div ref={stage} className="mapfly-stage" style={{ '--p': reduced ? 1 : 0 } as React.CSSProperties}>
-          <div ref={el} className="mapfly-map" />
-        </div>
+        <div className="mapfly-stage"><div ref={el} className="mapfly-map" /></div>
         {routeLabel && <p className="mapfly-route small">{routeLabel}</p>}
         {stops.map((s, i) => (
           <div key={s.title} className={`mapfly-card glass${card === i ? ' is-on' : ''}`} aria-hidden={card !== i}>
@@ -327,7 +380,7 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
             <button aria-pressed={mode === 'street'} onClick={() => setMode('street')}>Map</button>
           </div>
           <button className="btn btn-sm btn-primary" onClick={playing ? stop : play}>{playing ? '■ Stop' : '▶ Play journey'}</button>
-          <button className="btn btn-sm" onClick={toggleFree}>{free ? 'Back to fly-in' : 'Explore map'}</button>
+          <button className="btn btn-sm" onClick={toggleFree}>{free ? 'Back to journey' : 'Explore map'}</button>
           <a className="btn btn-sm" href={from ? `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lon}&destination=${lat},${lon}` : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`} target="_blank" rel="noreferrer">Directions ↗</a>
         </div>
         {(free || reduced) && (
@@ -336,7 +389,7 @@ export function MapFlyIn({ lat, lon, name, spots = [], zoomTo = 13.5, from }: { 
             <button onClick={() => zoomBy(-1)} aria-label="Zoom out">−</button>
           </div>
         )}
-        {!free && !reduced && <p className="mapfly-hint small">{playing ? `Travelling${from ? ` from ${from.name}` : ''} to ${name}…` : `Scroll — or tap the ${name} pin — to travel${from ? ` from ${from.name}` : ''}`}</p>}
+        {!free && !reduced && <p className="mapfly-hint small">{playing ? `Travelling${from ? ` from ${from.name}` : ''} to ${name}…` : `Scroll to fly from the Earth${from ? ` via ${from.name}` : ''} to ${name} — or tap the pin`}</p>}
       </div>
     </section>
     {stops.length > 0 && (

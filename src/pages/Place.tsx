@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DestinationCard } from '../components/discovery';
 import { LiveWeather } from '../components/LiveWidgets';
 import { MapFlyIn } from '../components/MapFlyIn';
@@ -6,7 +7,7 @@ import { setBackdrop } from '../components/PageDolly';
 import { HeroImage } from '../components/HeroImage';
 import type { Destination } from '../data/types';
 import { weatherLabel, useWeather } from '../lib/live';
-import { connectedPlaces, kmBetween, nearbySpots, nearestCity, nearestCurated, placeHref, placeSummary, type NearbySpot, type PlaceHit, type WikiSummary } from '../lib/places';
+import { connectedPlaces, kmBetween, placeGallery, type GalleryPhoto, nearbySpots, nearestCity, nearestCurated, placeHref, placeSummary, type NearbySpot, type PlaceHit, type WikiSummary } from '../lib/places';
 import { href, navigate, useRoute } from '../lib/router';
 import { useMoney } from '../lib/store';
 import { quickEstimate } from '../lib/tiers';
@@ -48,11 +49,13 @@ export default function Place() {
   const [sum, setSum] = useState<WikiSummary | null | 'loading'>('loading');
   const [spots, setSpots] = useState<NearbySpot[]>([]);
   const [linked, setLinked] = useState<NearbySpot[]>([]);
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [open, setOpen] = useState<number | null>(null);
   const money = useMoney();
 
   useEffect(() => {
     const ctl = new AbortController();
-    setSum('loading'); setSpots([]); setLinked([]);
+    setSum('loading'); setSpots([]); setLinked([]); setPhotos([]);
     placeSummary(hit, ctl.signal).then((s) => !ctl.signal.aborted && setSum(s));
     return () => ctl.abort();
   }, [hit]);
@@ -80,14 +83,35 @@ export default function Place() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.lat, target?.lon, s?.title]);
 
+  // 4K gallery: photos from the article, then Wikimedia Commons.
+  useEffect(() => {
+    if (sum === 'loading') return;
+    const ctl = new AbortController();
+    // Few photos of a small place? Fill in with the sights right around it.
+    const extra = [...linked.slice(0, 2), ...spots.slice(0, 2)].map((p) => p.title);
+    placeGallery(s?.title ?? hit.title, [hit.name, hit.region].filter(Boolean).join(' '), ctl.signal, extra).then((g) => !ctl.signal.aborted && setPhotos(g)).catch(() => undefined);
+    return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sum === 'loading', s?.title, hit.name, spots.length > 0, linked.length > 0]);
+  useEffect(() => {
+    if (open === null) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(null);
+      if (e.key === 'ArrowRight') setOpen((i) => (i === null ? i : (i + 1) % photos.length));
+      if (e.key === 'ArrowLeft') setOpen((i) => (i === null ? i : (i - 1 + photos.length) % photos.length));
+    };
+    addEventListener('keydown', k);
+    return () => removeEventListener('keydown', k);
+  }, [open, photos.length]);
+
   // 3D background: photos of this place only.
   useEffect(() => {
     // Landscape photos only: portraits or tiny images would be blown up and cropped full-screen.
     const wide = (src?: string, w?: number, h?: number) => (src && (!w || !h || (w > h * 1.15 && w >= 900)) ? src : undefined);
-    const urls = [wide(s?.image, s?.imageW, s?.imageH), ...linked.map((p) => wide(p.image, p.imageW, p.imageH)), ...spots.map((p) => wide(p.image, p.imageW, p.imageH))]
+    const urls = [...photos.filter((g) => g.w > g.h * 1.2).slice(0, 3).map((g) => g.large), wide(s?.image, s?.imageW, s?.imageH), ...linked.map((p) => wide(p.image, p.imageW, p.imageH)), ...spots.map((p) => wide(p.image, p.imageW, p.imageH))]
       .filter((u, i, a): u is string => !!u && a.indexOf(u) === i).slice(0, 5);
     setBackdrop(urls.map((src) => ({ src })));
-  }, [s?.image, spots, linked]);
+  }, [s?.image, spots, linked, photos]);
   useEffect(() => () => setBackdrop([]), []);
 
   const w = useWeather(target?.lat ?? 0, target?.lon ?? 0);
@@ -158,6 +182,21 @@ export default function Place() {
           </div>
         </section>
 
+        {photos.length > 0 && (
+          <section aria-labelledby="gal">
+            <h2 id="gal" style={{ fontSize: '1.8rem' }}>Photos of {hit.name}</h2>
+            <p className="muted small">{photos.length} high-resolution photographs from Wikimedia Commons — tap one to view it full screen{photos.some((g) => g.w >= 3840) ? ' in 4K' : ''}.</p>
+            <div className="place-gallery">
+              {photos.map((g, i) => (
+                <button key={g.title} className="pg-item" onClick={() => setOpen(i)} aria-label={`View photo ${i + 1} of ${photos.length} full screen`}>
+                  <img src={g.thumb} alt={g.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, '').replace(/_/g, ' ')} loading="lazy" referrerPolicy="no-referrer" />
+                  {g.w >= 3840 && <span className="tag pg-4k">4K</span>}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {linked.length > 0 && (
           <section aria-labelledby="linked">
             <h2 id="linked" style={{ fontSize: '1.8rem' }}>Places connected with {hit.name}</h2>
@@ -211,6 +250,18 @@ export default function Place() {
           </section>
         )}
       </div>
+      {open !== null && photos[open] && createPortal(
+        <div className="pg-lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => setOpen(null)}>
+          <img src={photos[open].full} srcSet={`${photos[open].large} 1920w, ${photos[open].full} 3840w`} sizes="100vw" alt={photos[open].title.replace(/^File:/, '')} referrerPolicy="no-referrer" onClick={(e) => e.stopPropagation()} />
+          <button className="btn btn-sm pg-prev" aria-label="Previous photo" onClick={(e) => { e.stopPropagation(); setOpen((open - 1 + photos.length) % photos.length); }}>‹</button>
+          <button className="btn btn-sm pg-next" aria-label="Next photo" onClick={(e) => { e.stopPropagation(); setOpen((open + 1) % photos.length); }}>›</button>
+          <button className="btn btn-sm pg-close" aria-label="Close" onClick={() => setOpen(null)}>✕</button>
+          <p className="pg-cap tiny" onClick={(e) => e.stopPropagation()}>
+            {open + 1} / {photos.length} · {photos[open].w}×{photos[open].h}{photos[open].author ? ` · ${photos[open].author}` : ''}{photos[open].license ? ` · ${photos[open].license}` : ''} · <a href={photos[open].page} target="_blank" rel="noreferrer">Source ↗</a>
+          </p>
+        </div>,
+        document.body,
+      )}
     </main>
   );
 }

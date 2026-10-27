@@ -14,7 +14,7 @@ function CreditList() {
     <details className="small">
       <summary style={{ cursor: 'pointer' }}>Full list: {photos.length} photographs and {new Set(sounds.map(([, s]) => s.file)).size} recordings</summary>
       <ul style={{ maxHeight: 360, overflow: 'auto' }}>
-        {sounds.filter(([, s]) => !seen.has(s.file) && seen.add(s.file)).map(([k, s]) => <li key={k}>🔊 <a href={s.source} target="_blank" rel="noreferrer">{s.file.replace('File:', '')}</a> — {s.author}, {s.license}</li>)}
+        {sounds.filter(([, s]) => !seen.has(s.file) && seen.add(s.file)).map(([k, s], i) => <li key={`${i}-${k}`}>🔊 <a href={s.source} target="_blank" rel="noreferrer">{s.file.replace('File:', '')}</a> — {s.author}, {s.license}</li>)}
         {photos.map((p) => <li key={p.id + p.file}>📷 <a href={p.source} target="_blank" rel="noreferrer">{p.file.replace('File:', '')}</a> — {p.author.slice(0, 80)}, {p.license}</li>)}
       </ul>
     </details>

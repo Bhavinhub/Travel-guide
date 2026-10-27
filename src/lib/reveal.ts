@@ -10,7 +10,7 @@ export function installReveal() {
         io.unobserve(e.target);
       }
     });
-  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+  }, { rootMargin: '0px 0px -4% 0px', threshold: 0 });
   const SEL = 'main .card, main .glass, main .grid > *, main .tl-item, main .day';
   const SKIP = '.planner aside, .portal-overlay, .chapter-nav, [data-no-reveal], .dock, .nav, .lightbox, .drawer';
   const scan = (root: ParentNode) => {
@@ -18,10 +18,14 @@ export function installReveal() {
       if (el.dataset.revealed || el.closest(SKIP)) return;
       el.dataset.revealed = '1';
       el.classList.add('reveal');
+      // Tall panels get a flat fade-up: a 3D tilt on something taller than the screen throws it far off course.
+      if (el.offsetHeight > innerHeight * 0.8) el.classList.add('reveal-flat');
       io.observe(el);
     });
     root.querySelectorAll<HTMLElement>('.reveal:not(.in)').forEach((el) => io.observe(el));
   };
   scan(document);
-  new MutationObserver(() => scan(document)).observe(document.body, { childList: true, subtree: true });
+  // Re-scan for new content at most once per frame.
+  let queued = 0;
+  new MutationObserver(() => { if (!queued) queued = requestAnimationFrame(() => { queued = 0; scan(document); }); }).observe(document.body, { childList: true, subtree: true });
 }

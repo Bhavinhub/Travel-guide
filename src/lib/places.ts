@@ -132,7 +132,9 @@ function similarity(a: string, b: string) {
 }
 
 /** Wikipedia entries that are not places a traveller visits. */
-const NOT_TOURISTY = /country in|state in|state of|union territory|district of|district in|newspaper|magazine|province|legislat|parliament|rajya sabha|lok sabha|ministry|government|court|college|school|university|institute|company|bank|hospital|office|constituency|railway|station|political party|district$|tehsil|census town|television|radio|cricket|stadium|police|cantonment|headquarters|embassy|airport|metro/i;
+const NOT_TOURISTY = /academy|military|army|regiment|air force|naval|country in|state in|state of|union territory|district of|district in|newspaper|magazine|province|legislat|parliament|rajya sabha|lok sabha|ministry|government|court|college|school|university|institute|company|bank|hospital|office|constituency|railway|station|political party|district$|tehsil|census town|television|radio|cricket|stadium|police|cantonment|headquarters|embassy|airport|metro/i;
+/** Sights worth stopping for on a road trip (stricter than SACRED_OR_SCENIC: no plain towns or villages). */
+export const SCENIC_STOP = /temple|mandir|ashram|shrine|ghat|lake|\btal\b|falls|waterfall|fort|palace|peak|valley|national park|sanctuary|dam\b|confluence|prayag|river|bridge|viewpoint|hill station|monastery|gompa|church|cathedral|mosque|dargah|gurudwara|garden|beach|museum|monument|tomb|stupa|caves?\b|glacier|reservoir|barrage/i;
 export const SACRED_OR_SCENIC = /temple|ashram|mandir|shrine|math\b|monastery|gompa|mosque|dargah|gurudwara|church|cathedral|ghat|peak|lake|falls|fort|palace|hill|valley|national park|sanctuary|beach|town|city|village|pilgrim/i;
 
 /** Places linked from an article that have coordinates — e.g. the ashrams and temples connected with a person —
@@ -246,4 +248,87 @@ export const clearSearches = () => storage.set(KEY, []);
 export function nearestCity(lat: number, lon: number, country?: string) {
   const pool = DEPARTURE_CITIES.filter((c) => (country === 'India' ? c.country === 'India' : true) && kmBetween(c, { lat, lon }) > 25);
   return pool.reduce((b, c) => (kmBetween(c, { lat, lon }) < kmBetween(b, { lat, lon }) ? c : b), pool[0]);
+}
+
+/**
+ * Photos for named attractions: only an exact Wikipedia article match (or its redirect) counts,
+ * so a card never shows a different place. Tries "Name" and "Name, Region".
+ */
+export async function attractionPhotos(names: string[], region?: string): Promise<Record<string, string>> {
+  // "Namdroling Monastery (Golden Temple)" → also "Namdroling Monastery"; "Raja’s Seat sunset" → "Raja's Seat".
+  const variants = (n: string) => {
+    const base = n.replace(/\s*\(.*?\)\s*/g, ' ').replace(/[’‘]/g, "'").trim();
+    const trimmed = base.replace(/\s+(sunset|sunrise|walk|visit|tour|trek|ride|cruise|boating|evening|morning|darshan|aarti)$/i, '').trim();
+    return [...new Set([n, base, trimmed])];
+  };
+  const tries = names.flatMap((n) => variants(n).flatMap((v) => [v, region ? `${v}, ${region}` : ''])).filter(Boolean);
+  try {
+    const j = await getJSON<{ query?: { normalized?: { from: string; to: string }[]; redirects?: { from: string; to: string }[]; pages?: Record<string, { title: string; missing?: string; thumbnail?: { source: string }; coordinates?: unknown[] }> } }>(
+      `${WIKI}/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages|coordinates&piprop=thumbnail&pithumbsize=960&titles=${encodeURIComponent(tries.slice(0, 50).join('|'))}`);
+    const q = j.query ?? {};
+    const follow = (t: string) => {
+      const n = q.normalized?.find((x) => x.from === t)?.to ?? t;
+      return q.redirects?.find((x) => x.from === n)?.to ?? n;
+    };
+    const byTitle = new Map(Object.values(q.pages ?? {}).filter((p) => !('missing' in p) && p.thumbnail && p.coordinates?.length /* a real place, not a general topic */).map((p) => [p.title, p.thumbnail!.source]));
+    const out: Record<string, string> = {};
+    names.forEach((n) => {
+      const hit = variants(n).map((v) => byTitle.get(follow(v)) ?? (region ? byTitle.get(follow(`${v}, ${region}`)) : undefined)).find(Boolean);
+      if (hit) out[n] = hit;
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/* ───────── 4K photo gallery for any place (Wikimedia Commons) ───────── */
+
+export interface GalleryPhoto { title: string; thumb: string; large: string; full: string; w: number; h: number; author?: string; license?: string; page: string }
+
+const GALLERY_BAD = /(map|locator|flag|seal|logo|emblem|coat.of.arms|icon|symbol|diagram|chart|signature|graph|plan\b|montage|collage|poster|stamp|document|scan|newspaper|portrait of|\.svg|\.png|\.gif|\.tif)/i;
+const STD_WIDTHS = [3840, 2560, 1920, 1280, 960];
+/** Wikimedia thumbnails exist at standard widths; pick the largest the original can supply. */
+function commonsThumb(url: string, origW: number, want: number) {
+  const m = url.match(/^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons)\/(\w)\/(\w\w)\/([^?]+)/);
+  const w = STD_WIDTHS.find((x) => x <= Math.min(want, origW));
+  if (!m || !w || w >= origW) return url;
+  return `${m[1]}/thumb/${m[2]}/${m[3]}/${m[4]}/${w}px-${m[4]}`;
+}
+const strip = (s?: string) => (s ? s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : undefined);
+
+interface InfoPage { title: string; imageinfo?: { url: string; width: number; height: number; mime?: string; extmetadata?: Record<string, { value: string }> }[] }
+
+/**
+ * Up to 18 high-resolution photographs of a place: the photos used in its Wikipedia article first,
+ * then Wikimedia Commons search results. Only real photos (JPEG) at least 2000 px wide are kept,
+ * and each opens at up to 3840 px (4K).
+ */
+export async function placeGallery(articleTitle: string | undefined, query: string, signal?: AbortSignal, extraQueries: string[] = []): Promise<GalleryPhoto[]> {
+  const ii = 'prop=imageinfo&iiprop=url|size|mime|extmetadata&iiextmetadatafilter=Artist|LicenseShortName';
+  const reqs: Promise<{ query?: { pages?: Record<string, InfoPage> } }>[] = [];
+  if (articleTitle) reqs.push(getJSON(`${WIKI}/w/api.php?action=query&format=json&origin=*&generator=images&gimlimit=50&titles=${encodeURIComponent(articleTitle)}&${ii}`, signal));
+  [query, ...extraQueries.slice(0, 3)].forEach((q, i) => reqs.push(getJSON(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=${i ? 12 : 30}&gsrsearch=${encodeURIComponent(`${q} filetype:bitmap`)}&${ii}`, signal)));
+  const results = await Promise.allSettled(reqs);
+  // A photo must name the place (or the nearby sight searched) in its file name.
+  const words = [query, ...extraQueries].flatMap((q) => q.toLowerCase().split(/[^a-z\u00C0-\u024f]+/)).filter((w) => w.length >= 4 && !/^(india|state|district|uttar|pradesh|north|south|east|west|city|town)$/.test(w));
+  const mentions = (t: string) => { const l = t.toLowerCase(); return !words.length || words.some((w) => l.includes(w) || l.includes(w.slice(0, 5))); };
+  const seen = new Set<string>();
+  const out: GalleryPhoto[] = [];
+  results.forEach((r) => {
+    if (r.status !== 'fulfilled') return;
+    Object.values(r.value.query?.pages ?? {}).forEach((p) => {
+      const info = p.imageinfo?.[0];
+      if (!info || seen.has(p.title)) return;
+      if (!/jpe?g/i.test(info.mime ?? info.url) || GALLERY_BAD.test(p.title) || NOT_TOURISTY.test(p.title) || /station|roadways|bus stand|depot|banner|signboard|chouraha|market|traffic/i.test(p.title) || info.width < 1600 || !mentions(p.title)) return;
+      seen.add(p.title);
+      out.push({
+        title: p.title, w: info.width, h: info.height, page: `https://commons.wikimedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
+        thumb: commonsThumb(info.url, info.width, 960), large: commonsThumb(info.url, info.width, 1920), full: commonsThumb(info.url, info.width, 3840),
+        author: strip(info.extmetadata?.Artist?.value)?.slice(0, 60), license: info.extmetadata?.LicenseShortName?.value,
+      });
+    });
+  });
+  // Widest, sharpest photos first.
+  return out.slice(0, 24);
 }

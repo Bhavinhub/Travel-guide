@@ -24,7 +24,7 @@ export function DestImage({ dest, large = false, credit = true, mediaId, index =
     return (
       <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
         <img src={srcOf(local, large ? 'large' : 'card')} srcSet={srcSet(local)} sizes={large ? '100vw' : sizes} alt={`${dest.name} — ${fileLabel(local)}`} loading="lazy" decoding="async" onError={() => setBroken(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        {credit && <a className="media-credit" href={local.source} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>Photo: {creditLine(local)}</a>}
+        {credit && <span className="media-credit" title={local.source}>Photo: {creditLine(local)}</span>}
       </div>
     );
   }
@@ -36,7 +36,7 @@ export function DestImage({ dest, large = false, credit = true, mediaId, index =
       {img && !broken && (
         <>
           <img src={large ? img.srcLarge : img.src} alt={`${dest.name}: ${img.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, '').replace(/_/g, ' ')}`} loading="lazy" decoding="async" onError={() => setBroken(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          {credit && <a className="media-credit" href={img.page} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>Photo: {img.author ? img.author.slice(0, 40) : 'Wikimedia Commons'}{img.license ? ` · ${img.license}` : ''}</a>}
+          {credit && <span className="media-credit" title={img.page}>Photo: {img.author ? img.author.slice(0, 40) : 'Wikimedia Commons'}{img.license ? ` · ${img.license}` : ''}</span>}
         </>
       )}
     </div>

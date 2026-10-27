@@ -1,6 +1,7 @@
+import { attractionPhotos } from '../lib/places';
 import { HeroImage } from '../components/HeroImage';
 import { PackingChecklist } from '../components/PackingChecklist';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { COMPANY, PRICING_BASIS } from '../config/company';
 import { getDeparture, mustDestination } from '../data/catalog';
 import { DOMESTIC_AIRLINES, ICONIC_EATS, INDIA_GROUND, INDIAN_INTL, INTL_AIRLINES, LOCAL_RIDES, CAR_RENTAL_INTL, type Provider } from '../data/booking';
@@ -259,6 +260,8 @@ export default function Trip() {
   const options = useMemo(() => legOptions({ name: home.name, lat: home.lat, lon: home.lon, tz: home.tz, country: home.country, hasRail: home.hasRail }, { name: d.name, lat: d.lat, lon: d.lon, tz: d.tz, country: d.country }, d, c.travelClass, c.adults + c.children), [c, d, home]);
   const leg = draft.days[0]?.items.find((i) => i.type === 'transit' && i.costCategory === 'mainTransport') ? generateItinerary(c).outbound?.leg : undefined;
   const imgs = localImages(d.id);
+  const [spotPics, setSpotPics] = useState<Record<string, string>>({});
+  useEffect(() => { let on = true; attractionPhotos(d.attractions.slice(0, 6).map((a) => a.name), d.state ?? d.country).then((x) => on && setSpotPics(x)); return () => { on = false; }; }, [d]);
   const set = (p: Partial<TripConfig>) => setConfig(p, { regenerate: true });
   const sameCity = home.name === d.name;
   const maxDay = Math.max(...est.daily.map((x) => x.total), 1);
@@ -306,16 +309,18 @@ export default function Trip() {
           <h2 id="hl">Highlights of {d.name}</h2>
           <p className="lead" style={{ maxWidth: '70ch' }}>{d.why}</p>
           <div className="grid grid-auto">
-            {d.attractions.slice(0, 6).map((a, i) => (
+            {d.attractions.slice(0, 6).map((a) => (
               <div key={a.id} className="card glass" data-tilt>
                 <div style={{ position: 'relative', aspectRatio: '16/10' }}>
-                  {imgs.length ? <img src={srcOf(imgs[i % imgs.length], 'card')} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <DestImage dest={d} />}
+                  {spotPics[a.name] ? <img src={spotPics[a.name]} alt={a.name} loading="lazy" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : imgs.length ? <img src={srcOf(imgs[0], 'card')} alt={`${d.name}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <DestImage dest={d} />}
+                  {!spotPics[a.name] && <span className="tag photo-note">{d.name}</span>}
                 </div>
                 <div className="pad-sm"><strong>{a.name}</strong><div className="tiny muted">{fmtDur(a.durationMin)} · {a.costINR ? `~${money(a.costINR)} pp` : 'free'} · best {a.slot}</div></div>
               </div>
             ))}
           </div>
-          <p className="tiny muted">Photos show {d.name} (Wikimedia Commons); they may not depict each specific attraction.</p>
+          <p className="tiny muted">Attraction photos from Wikipedia; cards tagged “{d.name}” show the destination where no photo of that exact place exists.</p>
         </section>
 
         <section className="glass panel pad" aria-labelledby="gt"><h2 id="gt" style={{ fontSize: '1.6rem' }}>Getting there</h2>{sameCity ? <p className="muted">You’re already in {d.name} — enjoy a staycation.</p> : <GettingThere c={c} d={d} leg={leg} options={options} />}</section>

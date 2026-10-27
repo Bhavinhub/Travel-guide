@@ -368,7 +368,7 @@ export default function Planner() {
       <div className="page-bg" />
       <div className="wrap stack" style={{ gap: '1.4rem' }}>
         <div className="print-only"><strong>{COMPANY.name}</strong> — {COMPANY.tagline}</div>
-        <header className="row between" style={{ alignItems: 'flex-end' }}>
+        <header className="row between glass panel pad planner-head" style={{ alignItems: 'flex-end' }}>
           <div style={{ flex: '1 1 420px' }}>
             <h1 className="eyebrow" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem', margin: '0 0 0.8rem' }}>Build My Trip</h1>
             <label htmlFor="trip-name" className="sr-only">Trip name</label>
