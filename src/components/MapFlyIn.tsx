@@ -5,7 +5,7 @@ import { DESTINATIONS, searchDestinations } from '../data/catalog';
 import { localImages, srcOf } from '../lib/localMedia';
 import { geocode, nearbySpots, placeHref, SACRED_OR_SCENIC, SCENIC_STOP, type NearbySpot } from '../lib/places';
 import { href, navigate } from '../lib/router';
-import { saveTripOffline } from '../lib/offlineMap';
+import { prefetchArrival, prefetchCorridor, saveTripOffline } from '../lib/offlineMap';
 import { useMotion } from '../lib/store';
 
 /**
@@ -45,6 +45,28 @@ function arc(a: [number, number], b: [number, number], n = 96): [number, number]
     return [Math.atan2(z, Math.hypot(x, y)) / r, Math.atan2(y, x) / r] as [number, number];
   });
 }
+
+/* MapLibre checks whether each marker is hidden behind 3D terrain by reading GPU depth pixels
+   (10 times a second per marker). With dozens of photo markers that stalls the GPU, floods the console
+   with readback warnings and makes the flight stutter. Markers here only need hiding on the far side
+   of the globe, which is cheap to test. */
+type MarkerInternals = { _map: MLMap; _lngLat: maplibregl.LngLat; _element: HTMLElement; _opacity: string; _opacityWhenCovered: string };
+(maplibregl.Marker.prototype as unknown as { _updateOpacity: () => void })._updateOpacity = function (this: MarkerInternals) {
+  if (!this._map) return;
+  const covered = this._map.transform.isLocationOccluded(this._lngLat);
+  const target = covered ? this._opacityWhenCovered : this._opacity;
+  if (this._element.style.opacity !== target) { this._element.style.opacity = target; this._element.classList.toggle('maplibregl-marker-covered', covered); }
+};
+
+/** Wikimedia photos at a size that suits where they're shown (markers are tiny; 1280px ones took ~8 s). */
+const thumbAt = (url: string | undefined, w: 250 | 500) => (url ?? '').replace(/\/\d+px-/, `/${w}px-`);
+/** A marker photo that fails to load shows a pin instead of an empty ring. */
+const markerImg = (url: string | undefined) => `<img src="${esc(thumbAt(url, 250))}" alt="" referrerpolicy="no-referrer">`;
+const guardImg = (d: HTMLElement) => {
+  const img = d.querySelector('img');
+  const fail = () => img?.replaceWith(Object.assign(document.createElement('i'), { className: 'map-noimg', textContent: '📍' }));
+  if (!img || !img.getAttribute('src')) fail(); else img.addEventListener('error', fail, { once: true });
+};
 
 interface Route {
   pts: [number, number][]; cum: number[]; mode: 'road' | 'air'; km: number; hours?: number;
@@ -151,13 +173,13 @@ function PlaceInput({ label, value, onPick }: { label: string; value: string; on
   const items = list;
   const pick = (p: MapOrigin & { sub?: string }) => { setQ(p.name); setOpen(false); onPick({ name: p.name, lat: p.lat, lon: p.lon }); };
   return (
-    <label className="mf-field" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>
+    <label className="mf-field" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setOpen(false); setQ(value); } }}>
       <span className="tiny muted">{label}</span>
-      <input className="input" value={q} placeholder="Any city or place" onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={(e) => { e.currentTarget.select(); setOpen(true); }}
+      <input className="input" aria-label={label} value={q} placeholder="Any city or place" onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={(e) => { e.currentTarget.select(); setOpen(true); }}
         onKeyDown={(e) => { if (e.key === 'Enter' && items[0]) { e.preventDefault(); pick(items[0]); } if (e.key === 'Escape') setOpen(false); }} />
       {open && items.length > 0 && (
         <span className="mf-list" role="listbox" onMouseDown={(e) => e.preventDefault()}>
-          {items.map((p, i) => <button type="button" key={`${p.name}-${i}`} role="option" aria-selected={false} onClick={() => pick(p)}><b>{p.name}</b>{p.sub && <span className="tiny muted"> {p.sub}</span>}</button>)}
+          {items.map((p, i) => <button type="button" key={`${p.name}-${i}`} role="option" aria-selected={false} aria-label={`${p.name}${p.sub ? `, ${p.sub}` : ''}`} onClick={() => pick(p)}><b>{p.name}</b>{p.sub && <span className="tiny muted"> {p.sub}</span>}</button>)}
         </span>
       )}
     </label>
@@ -306,7 +328,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       if (had) m.once('idle', () => { if (restingRef.current && !terrainOn.current && map.current === m) { terrainOn.current = true; m.setTerrain({ source: 'dem', exaggeration: 1.3 }); } });
     });
     ro.observe(el.current!);
+    // A tile that fails now and then (network hiccup) just retries on the next view — don't log it as an error.
+    m.on('error', (e) => { const msg = String((e as { error?: Error }).error?.message ?? ''); if (!/fetch|tile|AJAX|aborted/i.test(msg)) console.warn('Map:', msg); });
     map.current = m;
+    prefetchArrival(lat, lon); // the close-up at the destination is ready before the camera gets there
     if (import.meta.env.DEV) (window as unknown as { __map: maplibregl.Map }).__map = m;
     return () => { clearTimeout(fallback); ro.disconnect(); ready.current = false; terrainOn.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -339,7 +364,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       const d = document.createElement('div');
       d.className = 'map-photo map-tour';
       d.title = `${s.title} — open guide`;
-      d.innerHTML = `<img src="${esc(s.image ?? '')}" alt="" referrerpolicy="no-referrer"><b>${esc(s.title)}</b>`;
+      d.innerHTML = `${markerImg(s.image)}<b>${esc(s.title)}</b>`;
+      guardImg(d);
       const to = placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon });
       d.addEventListener('click', () => navigate(to));
       return new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(m);
@@ -364,6 +390,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const lngs = r.pts.map((p) => p[1]), lats = r.pts.map((p) => p[0]);
         const cam = m.cameraForBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 70 });
         const c = cam?.center as maplibregl.LngLat | undefined;
+        // Flights sweep across continents: drop stale tile requests so the visible area loads first.
+        // Road trips move slowly enough to keep every request (no half-loaded patches).
+        m.cancelPendingTileRequestsWhileZooming = r.mode === 'air';
+        prefetchCorridor(r.pts);
         routeRef.current = { r, fit: { center: c ? [c.lng, c.lat] : [(lon + from.lon) / 2, (lat + from.lat) / 2], zoom: Math.min(zoomTo - 2, cam?.zoom ?? 5) } };
         const o = document.createElement('div');
         o.className = 'map-origin';
@@ -371,13 +401,19 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         markers.push(new maplibregl.Marker({ element: o }).setLngLat([from.lon, from.lat]).addTo(m));
         const mv = document.createElement('div');
         mv.className = 'map-mover';
-        mv.textContent = r.mode === 'air' ? '✈' : '🚗';
+        mv.textContent = r.mode === 'air' ? '✈️' : '🚗';
         mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
         markers.push(mover.current);
         doneState.current = { n: -1, t: 0 };
         setRoute(r);
         kick.current();
-        if (autoplay.current) { autoplay.current = false; setTimeout(() => playFn.current(), 300); }
+        if (autoplay.current) {
+          autoplay.current = false;
+          // Bring the whole map on screen before the new journey plays (it may be half scrolled away).
+          const st = stickyRef.current?.getBoundingClientRect();
+          if (st && !fullRef.current && (st.top < -2 || st.bottom > innerHeight + 2)) sec.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(() => playFn.current(), 500);
+        }
       };
       if (ready.current) draw(); else m.once('load', draw);
       scenicStops(r, from, [lat, lon], ctl.signal).then((st) => {
@@ -386,7 +422,9 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         st.forEach((s, i) => {
           const d = document.createElement('div');
           d.className = 'map-photo';
-          d.innerHTML = `<img src="${esc(s.image ?? '')}" alt="" referrerpolicy="no-referrer"><b>${esc(s.title)}</b>`;
+          d.innerHTML = `${markerImg(s.image)}<b>${esc(s.title)}</b>`;
+          guardImg(d);
+      guardImg(d);
           d.addEventListener('click', () => { cardRef.current = i; setCard(i); });
           markers.push(new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(map.current!));
         });
@@ -436,7 +474,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const f = travelToDistance(rr.r, smooth(t)); // the walking stretch takes longer than its length
         const walking = isWalking(rr.r, f);
         const mv = mover.current?.getElement();
-        if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : rr.r.mode === 'air' ? '✈' : '🚗'; }
+        if (mv && mv.dataset.mode !== (walking ? 'walk' : 'drive')) { mv.dataset.mode = walking ? 'walk' : 'drive'; mv.textContent = walking ? '🚶' : rr.r.mode === 'air' ? '✈️' : '🚗'; }
         const { p: pt, i } = along(rr.r, f);
         const ahead = along(rr.r, Math.min(1, f + 0.04)).p;
         center = [lerp(rr.fit.center[0], pt[1], e), lerp(rr.fit.center[1], pt[0], e)];
@@ -601,8 +639,9 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
 
   const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
 
+  const hm = (h = 0) => `${Math.floor(h)} h ${Math.round((h % 1) * 60)} min`;
   const routeLabel = route && from
-    ? `${route.mode === 'air' ? '✈ By air' : '🚗 By road'} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · about ${Math.floor(route.hours)} h ${Math.round((route.hours % 1) * 60)} min` : ''}${route.walkKm ? ` + 🚶 ${route.walkKm.toFixed(1)} km on foot (about ${Math.floor(route.walkHours ?? 0)} h ${Math.round(((route.walkHours ?? 0) % 1) * 60)} min)` : ''}`
+    ? `${route.mode === 'air' ? '✈️ Flight' : '🚗 Road'} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · ${hm(route.hours)}` : ''}${route.walkKm ? `  ·  🥾 Trek ${route.walkKm.toFixed(1)} km · ${hm(route.walkHours)}` : ''}`
     : null;
 
   return (
@@ -624,7 +663,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         {routeLabel && <p className="mapfly-route small">{routeLabel}</p>}
         {stops.map((s, i) => (
           <div key={s.title} className={`mapfly-card glass${card === i ? ' is-on' : ''}`} aria-hidden={card !== i}>
-            {s.image && <img src={s.image} alt={s.title} referrerPolicy="no-referrer" />}
+            {s.image && <img src={thumbAt(s.image, 500)} alt={s.title} referrerPolicy="no-referrer" />}
             <div><span className="tiny muted">On the way · {s.kmFromStart} km from {from?.name}</span><b>{s.title}</b>{s.description && <span className="tiny muted">{s.description}</span>}
               <button type="button" className="btn btn-sm mf-visit" tabIndex={card === i ? 0 : -1} onClick={() => navigate(placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon }))}>Open guide →</button></div>
           </div>
@@ -660,7 +699,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
             const to = placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon });
             return (
               <a key={s.title} className="spot-card glass" href={href(to)} onClick={(e) => { e.preventDefault(); navigate(to); }}>
-                {s.image && <img src={s.image} alt={s.title} loading="lazy" referrerPolicy="no-referrer" />}
+                {s.image && <img src={thumbAt(s.image, 500)} alt={s.title} loading="lazy" referrerPolicy="no-referrer" />}
                 <span className="spot-body"><b>{s.title}</b><span className="tiny muted">{s.kmFromStart} km into the journey{s.description ? ` · ${s.description}` : ''}</span></span>
               </a>
             );

@@ -61,6 +61,53 @@ export async function saveTripOffline(pts: [number, number][], dest: [number, nu
   return ok;
 }
 
+/**
+ * Warm the browser cache with the destination's close-up tiles, quietly and in the background,
+ * so the arrival is sharp at once instead of waiting behind every tile requested along the way.
+ */
+const warmed = new Set<string>();
+export function prefetchArrival(lat: number, lon: number) {
+  const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+  if (warmed.has(key) || !navigator.onLine) return;
+  warmed.add(key);
+  const jobs: string[] = [];
+  for (let z = 9; z <= 16; z++) {
+    const [x, y] = tileOf(lat, lon, z), r = z >= 14 ? 2 : 1;
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+      jobs.push(url(TILE_URLS.satellite, z, x + dx, y + dy), url(TILE_URLS.labels, z, x + dx, y + dy));
+      if (z <= 11) jobs.push(url(TILE_URLS.dem, z, x + dx, y + dy));
+    }
+  }
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const u = jobs[next++];
+      try { await fetch(u, { mode: 'cors', priority: 'low' } as RequestInit); } catch { /* best effort */ }
+    }
+  };
+  for (let i = 0; i < 4; i++) worker();
+}
+
+/**
+ * Warm the cache with coarse imagery (zoom 2–8) along a whole route: the map's base layer then
+ * always has something sharp-enough under the camera, however fast it flies.
+ */
+export function prefetchCorridor(pts: [number, number][]) {
+  if (!pts.length || !navigator.onLine) return;
+  const keys = new Set<string>();
+  for (let z = 2; z <= 8; z++) {
+    const step = Math.max(1, Math.floor(pts.length / (z <= 5 ? 40 : 160))), r = z <= 6 ? 1 : 0;
+    for (let i = 0; i < pts.length; i += step) {
+      const [x, y] = tileOf(pts[i][0], pts[i][1], z);
+      for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) keys.add(`${z}/${x + dx}/${y + dy}`);
+    }
+  }
+  const jobs = [...keys].map((k) => { const [z, x, y] = k.split('/').map(Number); return url(TILE_URLS.satellite, z, x, y); });
+  let next = 0;
+  const worker = async () => { while (next < jobs.length) { const u = jobs[next++]; try { await fetch(u, { mode: 'cors' }); } catch { /* best effort */ } } };
+  for (let i = 0; i < 6; i++) worker();
+}
+
 /** Register the service worker (production builds only — the dev server stays uncached). */
 export function registerOffline() {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;

@@ -79,7 +79,9 @@ export function CursorFX() {
       if (pts.length > 160) pts.splice(0, pts.length - 160);
       // Over a photo: the colour-inverting disc. Over links/buttons: a gold ring. Elsewhere: a small ring.
       const t = e.target as Element | null;
-      const next = t?.closest?.('img, video, canvas.maplibregl-canvas, .pg-item, .top-photo, .media, .hero-fit, .zoom-loop') ? 'img'
+      // The 3D map keeps a plain small ring: an inverting lens over a live map just hides what you're looking at.
+      const next = t?.closest?.('.mapfly-map') ? ''
+        : t?.closest?.('img, video, .pg-item, .top-photo, .media, .hero-fit, .zoom-loop') ? 'img'
         : t?.closest?.('a, button, [role="button"], input, select, textarea, label') ? 'link' : '';
       if (next !== hover) {
         hover = next;

@@ -196,7 +196,7 @@ export function Nav() {
     <>
       <header className="nav glass" role="banner">
         <a className="brand" href={href('/')} aria-label={`${COMPANY.name} home`}>
-          <LogoMark />
+          <LogoMark size={48} />
           <Wordmark />
         </a>
         <nav aria-label="Main">
@@ -221,7 +221,7 @@ export function Nav() {
         <div className="drawer" onClick={() => setOpen(false)}>
           <div className="drawer-panel glass panel pad" id="site-menu" role="dialog" aria-modal="true" aria-label="Site menu" onClick={(e) => e.stopPropagation()}>
             <div className="row between" style={{ marginBottom: '1rem' }}>
-              <span className="row"><LogoMark size={30} /><Wordmark /></span>
+              <span className="row"><LogoMark size={36} /><Wordmark /></span>
               <button ref={closeRef} className="btn btn-sm btn-icon" aria-label="Close menu" onClick={() => setOpen(false)}>✕</button>
             </div>
             <div className="drawer-search"><NavSearch id="menu-q" /></div>
