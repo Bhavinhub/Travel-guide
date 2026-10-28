@@ -1581,3 +1581,5 @@ html[data-theme='light'] .cursor-ring { border-color: rgba(20, 40, 55, .7); back
 html[data-theme='light'] .cursor-ring[data-mode='link'] { border-color: rgba(200, 138, 44, .95); }
 @media (hover: none), (pointer: coarse) { .cursor-ring { display: none; } }
 html[data-motion='reduced'] .cursor-ring { display: none; }
+/* In-page jumps ("Fly to the map ↓", "Jump to destinations ↓", chapter links) stop below the floating header. */
+main [id], main section, main h2 { scroll-margin-top: calc(var(--nav-h) + 28px); }

@@ -240,7 +240,27 @@ export async function placeSummary(h: PlaceHit, signal?: AbortSignal): Promise<W
 }
 
 /** Notable spots near a point, with photos, from Wikipedia's geosearch. */
-export async function nearbySpots(lat: number, lon: number, signal?: AbortSignal): Promise<NearbySpot[]> {
+/** At most 3 Wikipedia map lookups at once (more get throttled and fail), and each spot asked only once. */
+const spotCache = new Map<string, Promise<NearbySpot[]>>();
+let spotActive = 0;
+const spotQueue: (() => void)[] = [];
+const spotSlot = () => new Promise<void>((res) => { if (spotActive < 3) { spotActive++; res(); } else spotQueue.push(() => { spotActive++; res(); }); });
+const spotDone = () => { spotActive--; spotQueue.shift()?.(); };
+
+export function nearbySpots(lat: number, lon: number, signal?: AbortSignal): Promise<NearbySpot[]> {
+  const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+  const hit = spotCache.get(key);
+  if (hit) return hit;
+  const p = (async () => {
+    await spotSlot();
+    try { return await nearbySpotsNow(lat, lon, signal); } finally { spotDone(); }
+  })();
+  spotCache.set(key, p);
+  p.then((r) => { if (!r.length) spotCache.delete(key); }); // retry empty results next time
+  return p;
+}
+
+async function nearbySpotsNow(lat: number, lon: number, signal?: AbortSignal): Promise<NearbySpot[]> {
   try {
     const j = await getJSON<{ query?: { pages: Record<string, { title: string; description?: string; coordinates?: { lat: number; lon: number }[]; thumbnail?: { source: string; width?: number; height?: number }; index: number }> } }>(
       `${WIKI}/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=10000&ggslimit=40&prop=coordinates|pageimages|description&piprop=thumbnail&pithumbsize=1280`, signal);
