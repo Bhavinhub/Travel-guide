@@ -1,4 +1,5 @@
 import { LiquidHover } from './components/LiquidHover';
+import { CursorRing } from './components/CursorRing';
 import { PageDolly, useBackdrop } from './components/PageDolly';
 import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { COMPANY } from './config/company';
@@ -184,6 +185,7 @@ export default function App() {
       <PageDolly ids={key && key !== 'place' ? dollyIds : []} photos={key === 'place' ? placePhotos : undefined} />
       <Nav />
       <LiquidHover />
+      <CursorRing />
       <ErrorBoundary key={routeKey}>
         <Suspense fallback={<main className="page" id="main"><div className="page-bg" /><div className="loader"><div className="spinner" /><p className="small">Loading…</p></div></main>}>
           <div className={key ? 'route-stage' : undefined} key={routeKey}>{page}</div>

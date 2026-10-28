@@ -1568,3 +1568,16 @@ html body .map-mover.is-arrived { visibility: visible; }
 .mf-travel { grid-template-columns: repeat(3, 1fr); }
 /* Multi-leg journeys: the route summary may run over two lines. */
 html body .mapfly .mapfly-route { white-space: normal; line-height: 1.35; text-align: center; max-width: min(640px, calc(100% - 2rem)); }
+
+/* Transparent round cursor that follows the pointer (the normal pointer stays visible). */
+.cursor-ring { position: fixed; left: 0; top: 0; z-index: 2000; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid rgba(255, 255, 255, .85); background: rgba(255, 255, 255, .06); box-shadow: 0 0 0 1px rgba(0, 0, 0, .18), 0 4px 14px rgba(0, 0, 0, .25);
+  opacity: 0; transition: opacity .25s, width .3s cubic-bezier(.2,.8,.2,1), height .3s cubic-bezier(.2,.8,.2,1), margin .3s cubic-bezier(.2,.8,.2,1), border-color .25s, background .25s; will-change: transform; }
+.cursor-ring.is-on { opacity: 1; }
+.cursor-ring[data-mode='link'] { width: 46px; height: 46px; margin: -23px 0 0 -23px; border-color: rgba(244, 200, 120, .95); background: rgba(244, 200, 120, .08); }
+.cursor-ring[data-mode='photo'] { width: 64px; height: 64px; margin: -32px 0 0 -32px; border-color: rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .04); }
+.cursor-ring.is-press { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
+html[data-theme='light'] .cursor-ring { border-color: rgba(20, 40, 55, .7); background: rgba(20, 40, 55, .05); box-shadow: 0 0 0 1px rgba(255,255,255,.4); }
+html[data-theme='light'] .cursor-ring[data-mode='link'] { border-color: rgba(200, 138, 44, .95); }
+@media (hover: none), (pointer: coarse) { .cursor-ring { display: none; } }
+html[data-motion='reduced'] .cursor-ring { display: none; }

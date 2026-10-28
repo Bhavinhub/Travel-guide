@@ -3845,5 +3845,25 @@
     }
    }
   ]
+ },
+ "dhari-devi": {
+  "article": "Dhari Devi Temple",
+  "caption": "Dhari Devi Temple on the Alaknanda, Uttarakhand",
+  "images": [
+   {
+    "file": "Dhari Devi Temple, Alaknanda river",
+    "width": 1500,
+    "height": 2000,
+    "author": "Photo supplied by the Travel Guide site owner",
+    "license": "Used with permission",
+    "licenseUrl": "",
+    "source": "https://travelguideworld.pages.dev/#/about",
+    "sizes": {
+     "480": "/media/dhari-devi/0-480.jpg",
+     "960": "/media/dhari-devi/0-960.jpg",
+     "1920": "/media/dhari-devi/0-full.jpg"
+    }
+   }
+  ]
  }
 }

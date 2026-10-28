@@ -12,7 +12,7 @@ import { useMotion } from '../lib/store';
  * displacement built from the last few pointer positions, and renders only while the trail is alive.
  */
 const TARGETS = '.top-photo img, .dcard img, .card .media img, .spot-card img, .portal img, .ring-card img, .pg-item img, .moment img, .dhero .bg img, .trip-hero img, .gallery img, .route-strip img';
-const MAX_PTS = 24, LIFE = 0.85; // seconds a trail point lives
+const MAX_PTS = 32, LIFE = 1.1; // seconds a trail point lives
 
 const VERT = `attribute vec2 p; varying vec2 uv; void main(){ uv = vec2(p.x * .5 + .5, .5 - p.y * .5); gl_Position = vec4(p, 0., 1.); }`;
 const FRAG = `precision mediump float;
@@ -33,12 +33,12 @@ void main() {
     float l = life[i];
     if (l <= 0.) continue;
     vec2 diff = (uv - pts[i].xy) * vec2(aspect, 1.);
-    float r = .07 + .05 * (1. - l);               // each blob widens a little as it fades
+    float r = .085 + .07 * (1. - l);              // each blob widens as it fades, like spreading liquid
     float f = exp(-dot(diff, diff) / (r * r)) * l * l;
     d += pts[i].zw * f;
   }
   vec2 q = clamp(uv - d, 0., 1.);
-  float k = clamp(length(d) * 1.6, 0., .035);       // rainbow split only where the image bends
+  float k = clamp(length(d) * 2.4, 0., .055);       // rainbow split only where the image bends
   vec2 dir = normalize(d + 1e-6) * k;
   float rC = texture2D(tex, cover(clamp(q + dir, 0., 1.))).r;
   float gC = texture2D(tex, cover(q)).g;
@@ -108,6 +108,7 @@ export function LiquidHover() {
       canvas.style.width = `${img.offsetWidth}px`; canvas.style.height = `${img.offsetHeight}px`;
       canvas.style.borderRadius = cs.borderRadius; canvas.style.transform = cs.transform === 'none' ? '' : cs.transform;
       canvas.style.translate = cs.translate === 'none' ? '' : cs.translate; canvas.style.scale = cs.scale === 'none' ? '' : cs.scale;
+      canvas.style.filter = cs.filter === 'none' ? '' : cs.filter; // same colour grade as the photo, so nothing flickers
       const dpr = Math.min(devicePixelRatio || 1, 1.5);
       const w = Math.max(1, Math.round(img.offsetWidth * dpr)), h = Math.max(1, Math.round(img.offsetHeight * dpr));
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -150,7 +151,7 @@ export function LiquidHover() {
       const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
       if (last) {
         // Velocity in photo units, softened and capped: fast flicks bend more, but never tear the image.
-        const vx = Math.max(-0.08, Math.min(0.08, (x - last.x) * 0.9)), vy = Math.max(-0.08, Math.min(0.08, (y - last.y) * 0.9));
+        const vx = Math.max(-0.1, Math.min(0.1, (x - last.x) * 1.15)), vy = Math.max(-0.1, Math.min(0.1, (y - last.y) * 1.15));
         if (Math.abs(vx) + Math.abs(vy) > 0.0008) { pts.push({ x, y, vx, vy, t: performance.now() / 1000 }); if (pts.length > MAX_PTS) pts.shift(); }
       }
       last = { x, y };

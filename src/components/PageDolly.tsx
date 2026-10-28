@@ -134,7 +134,11 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
         }
         const drift = i === i0 ? f : i === i0 + 1 ? f - 1 : 0; // a gentle cinematic drift between scenes
         const show = o > 0.001;
-        el.style.display = show ? '' : 'none';
+        // The scenes either side stay rendered (invisible) so their photos are already decoded when the camera
+        // reaches them — phones discard hidden images, and the first frame of a re-shown one flashes blank.
+        const standby = !show && (i === i0 - 1 || i === i0 + 2) && ready(i);
+        el.style.display = show || standby ? '' : 'none';
+        if (standby) { el.style.opacity = '0'; el.style.zIndex = '0'; }
         if (show) { el.style.opacity = o.toFixed(3); el.style.transform = `translate3d(${(drift * -18).toFixed(1)}px, ${(drift * -10).toFixed(1)}px, 0) rotate(${(drift * 0.6).toFixed(3)}deg) scale(${s.toFixed(4)})`; el.style.zIndex = String(i === i0 ? 2 : 1); }
       });
       const settled = cur === target && (!source || Math.abs(source.progress - cur) < 0.0005) && Math.abs(mx - cmx) < 0.001 && Math.abs(my - cmy) < 0.001;
