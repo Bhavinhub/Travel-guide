@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { COSMOS } from '../data/cosmos';
 
 /**
  * Keep zooming out past the Earth: the Moon, the Sun and planets (where they are today), the nearest stars,
@@ -78,7 +79,32 @@ function web(seed: number, radius: number) {
 }
 const WEB = web(21, EDGE);
 const BEYOND = web(33, 1); // unit-size pattern repeated at every scale past the edge (endless zoom)
-const SKY = (() => { const r = rng(5); return Array.from({ length: 260 }, () => [r(), r(), r() * 1.2 + 0.3, r()] as [number, number, number, number]); })();
+const STAR_TINTS = ['#9bb0ff', '#aabfff', '#cad7ff', '#f8f7ff', '#fff4ea', '#ffd2a1', '#ffcc6f', '#ffb56c']; // O B A F G K M star colours
+/** The night sky as a picture (drawn once per size): ~1,500 stars in their real colours, a few bright ones with a soft glow. */
+function starfield(W: number, H: number, dpr: number) {
+  const c = document.createElement('canvas'); c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const x = c.getContext('2d')!; x.scale(dpr, dpr);
+  const r = rng(5), n = Math.round((W * H) / 260);
+  for (let i = 0; i < n; i++) {
+    const sx = r() * W, sy = r() * H, m = Math.pow(r(), 3.2), col = STAR_TINTS[Math.floor(r() * STAR_TINTS.length)];
+    const rad = 0.35 + m * 1.5;
+    if (m > 0.55) { const g = x.createRadialGradient(sx, sy, 0, sx, sy, rad * 5); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.globalAlpha = 0.35; x.fillStyle = g; x.fillRect(sx - rad * 5, sy - rad * 5, rad * 10, rad * 10); }
+    x.globalAlpha = 0.35 + m * 0.65; x.fillStyle = col; x.beginPath(); x.arc(sx, sy, rad, 0, Math.PI * 2); x.fill();
+  }
+  return c;
+}
+/** Far beyond our galaxy the sky is full of other galaxies: tiny smudges in warm and blue tones (like the Hubble deep fields). */
+function deepfield(W: number, H: number, dpr: number) {
+  const c = document.createElement('canvas'); c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const x = c.getContext('2d')!; x.scale(dpr, dpr);
+  const r = rng(9), n = Math.round((W * H) / 900), tints = ['#ffd9a8', '#ffe9c9', '#c9d8ff', '#ffb98c', '#e8d0ff'];
+  for (let i = 0; i < n; i++) {
+    const sx = r() * W, sy = r() * H, s = 0.8 + Math.pow(r(), 4) * 7, col = tints[Math.floor(r() * tints.length)];
+    const g = x.createRadialGradient(0, 0, 0, 0, 0, s); g.addColorStop(0, col); g.addColorStop(0.35, col + 'aa'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.save(); x.translate(sx, sy); x.rotate(r() * Math.PI); x.scale(1, 0.35 + r() * 0.65); x.globalAlpha = 0.5 + r() * 0.5; x.fillStyle = g; x.beginPath(); x.arc(0, 0, s, 0, Math.PI * 2); x.fill(); x.restore();
+  }
+  return c;
+}
 
 export interface EarthOnScreen { x: number; y: number; r: number }
 /** The map's globe as a picture: the snapshot and where the globe sits in it (snapshot pixels). */
@@ -103,6 +129,10 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
   const earthRef = useRef(earth); earthRef.current = earth;
   const onDepthRef = useRef(onDepth); onDepthRef.current = onDepth;
   const start = useRef<EarthOnScreen | null>(null);
+  /** What was drawn where (this frame): tapping looks it up here. */
+  const hits = useRef<{ name: string; x: number; y: number; r: number }[]>([]);
+  const [sel, setSel] = useState<string | null>(null);
+  const sky = useRef<{ key: string; stars?: HTMLCanvasElement; deep?: HTMLCanvasElement }>({ key: '' });
 
   useEffect(() => {
     tgt.current = target;
@@ -119,7 +149,7 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     cur.current = Math.abs(diff) < 0.002 ? tgt.current : cur.current + diff * 0.09;
     const d = cur.current;
     onDepthRef.current(d);
-    if (d <= 0.001) { start.current = null; c.style.opacity = '0'; if (cap.current) cap.current.style.opacity = '0'; return; }
+    if (d <= 0.001) { start.current = null; c.style.opacity = '0'; c.style.pointerEvents = 'none'; setSel(null); if (cap.current) cap.current.style.opacity = '0'; return; }
     if (!start.current) start.current = earthRef.current() ?? null;
     draw(c, d);
     if (Math.abs(tgt.current - cur.current) > 0.0005) raf.current = requestAnimationFrame(frame);
@@ -130,8 +160,10 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
     const x = c.getContext('2d')!;
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    hits.current = [];
     x.clearRect(0, 0, W, H);
     c.style.opacity = '1';
+    c.style.pointerEvents = d > 0.3 ? 'auto' : 'none';
     const e0 = start.current ?? { x: W / 2, y: H / 2, r: Math.min(W, H) * 0.3 };
     const S = (e0.r / 6371) * Math.pow(10, -d); // pixels per km
     const v = Math.log10(W / S); // the view's width as a power of ten (km): every stage keys off this
@@ -146,6 +178,7 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     const ax = lerp(e0.x, W / 2, k), ay = lerp(e0.y, H / 2, k);
     const P = (p: [number, number]) => [ax + (p[0] - F[0]) * S, ay + (p[1] - F[1]) * S] as const;
     const on = (sx: number, sy: number, m = 60) => sx > -m && sy > -m && sx < W + m && sy < H + m;
+    const hit = (name: string, sx: number, sy: number, rad: number, a = 1) => { if (a > 0.25 && on(sx, sy, rad)) hits.current.push({ name, x: sx, y: sy, r: rad }); };
     const label = (t: string, sx: number, sy: number, a = 1, size = 12, color = '#fff') => {
       if (a <= 0.02 || !on(sx, sy, 0)) return;
       x.globalAlpha = a; x.font = `600 ${size}px system-ui, sans-serif`; x.fillStyle = color; x.shadowColor = 'rgba(0,0,0,.95)'; x.shadowBlur = 6;
@@ -164,9 +197,16 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     };
 
     // Deep background: a black sky that thickens as the photo of the Milky Way fades away.
-    x.fillStyle = `rgba(2,3,8,${clamp((v - 6) / 3) * 0.92})`; x.fillRect(0, 0, W, H);
-    SKY.forEach(([u, v, s, t]) => { x.globalAlpha = clamp((v - 6.5) / 3) * (0.35 + 0.5 * t); x.fillStyle = '#e8eeff'; x.fillRect(u * W, v * H, s, s); });
-    x.globalAlpha = 1;
+    // Real night sky: the photo of the Milky Way stays behind (see --sky-o), dimmed a little, with the stars on top;
+    // once the camera is outside our galaxy, a field of distant galaxies takes over.
+    x.fillStyle = `rgba(2,3,8,${clamp((v - 6) / 3) * 0.45 + clamp((v - 17.2) / 1) * 0.4})`; x.fillRect(0, 0, W, H);
+    const key = `${W}x${H}x${dpr}`;
+    if (sky.current.key !== key) sky.current = { key, stars: starfield(W, H, dpr), deep: deepfield(W, H, dpr) };
+    const drift = 1 + (v % 1) * 0.12; // a slow parallax drift as the view grows
+    x.save(); x.translate(W / 2, H / 2); x.scale(drift, drift); x.translate(-W / 2, -H / 2);
+    x.globalAlpha = clamp((v - 5.6) / 2) * (1 - clamp((v - 17.6) / 1.2) * 0.75); x.drawImage(sky.current.stars!, 0, 0, W, H);
+    x.globalAlpha = clamp((v - 17.2) / 1.2); x.drawImage(sky.current.deep!, 0, 0, W, H);
+    x.restore(); x.globalAlpha = 1;
 
     const sunS = P(SUN);
     // ── Solar system ──
@@ -181,17 +221,19 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
       const ml = ((218.32 + 13.176396 * days) * Math.PI) / 180, moon: [number, number] = [E[0] + Math.cos(ml) * 384400, E[1] - Math.sin(ml) * 384400];
       const es = P(E), mo = P(moon), morb = 384400 * S;
       if (morb > 10 && morb < 60000) { x.strokeStyle = 'rgba(220,220,220,.25)'; x.beginPath(); x.arc(es[0], es[1], morb, 0, Math.PI * 2); x.stroke(); }
-      if (morb > 6) { ball(mo[0], mo[1], Math.max(1737 * S, 2.4), '#cfcac2', sunS); label('Moon', mo[0], mo[1], clamp((morb - 10) / 30)); }
+      if (morb > 6) { ball(mo[0], mo[1], Math.max(1737 * S, 2.4), '#cfcac2', sunS); hit('Moon', mo[0], mo[1], Math.max(1737 * S, 2.4), ss * clamp((morb - 10) / 30)); label('Moon', mo[0], mo[1], clamp((morb - 10) / 30)); }
       // Sun
       const sr = Math.max(696340 * S, 6);
       glow(sunS[0], sunS[1], sr * 5, 'rgba(255,190,90,.55)'); glow(sunS[0], sunS[1], sr * 1.6, 'rgba(255,236,170,.95)');
       x.fillStyle = '#fff6d8'; x.beginPath(); x.arc(sunS[0], sunS[1], sr, 0, Math.PI * 2); x.fill();
+      hit('Sun', sunS[0], sunS[1], sr, ss);
       label('Sun', sunS[0] + sr * 0.6, sunS[1], clamp((v - 7.4) / 1) * clamp(1 - (v - 13.4) / 0.6));
       PLANETS.forEach((p) => {
         const w = pos(p), s = P(w);
         const isEarth = p.name === 'Earth';
         const r = Math.max(p.r * S, p.min);
         if (!on(s[0], s[1], r + 20)) return;
+        hit(p.name, s[0], s[1], r, ss);
         if (isEarth && d < 1.2) {
           // Close to home: the real globe (a snapshot of the map) shrinking away, then a blue marble.
           const em = earthRef.current();
@@ -217,7 +259,7 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     if (st > 0) STARS.forEach(([n, ly, ra, col, sz]) => {
       const a = (ra * Math.PI) / 180, s = P([Math.cos(a) * ly * LY, -Math.sin(a) * ly * LY]);
       if (!on(s[0], s[1])) return;
-      glow(s[0], s[1], sz * 4, col, st * 0.7); x.globalAlpha = st; x.fillStyle = col; x.beginPath(); x.arc(s[0], s[1], sz * 0.7, 0, Math.PI * 2); x.fill();
+      hit(n, s[0], s[1], sz * 1.5, st); glow(s[0], s[1], sz * 4, col, st * 0.7); x.globalAlpha = st; x.fillStyle = col; x.beginPath(); x.arc(s[0], s[1], sz * 0.7, 0, Math.PI * 2); x.fill();
       const sep = ly * LY * S; label(n, s[0], s[1], st * clamp((sep - 25) / 40), 11);
     });
     if (st > 0 && v > 13.4) label('Sun', sunS[0], sunS[1], st * clamp(1 - (v - 17) / 0.8));
@@ -245,6 +287,7 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
       x.globalAlpha = mw; x.strokeStyle = '#ffb44d'; x.lineWidth = br * 0.45; x.shadowColor = '#ff9a2a'; x.shadowBlur = 12;
       x.beginPath(); x.arc(gc[0], gc[1], br, 0, Math.PI * 2); x.stroke(); x.shadowBlur = 0;
       x.fillStyle = '#000'; x.beginPath(); x.arc(gc[0], gc[1], br * 0.72, 0, Math.PI * 2); x.fill(); x.globalAlpha = 1;
+      hit('Sagittarius A*', gc[0], gc[1], br, mw * clamp(1 - (v - 19.4) / 0.6)); hit('Milky Way', gc[0], gc[1], Math.max(gr * 0.9, 10), mw);
       label('Sagittarius A* — black hole', gc[0] + br, gc[1], mw * clamp(1 - (v - 19.4) / 0.6), 11.5, '#ffd08a');
       label('Milky Way', gc[0] - gr * 0.2, gc[1] + gr * 0.75, mw * clamp((v - 17.4) / 0.6) * clamp(1 - (v - 19.9) / 0.4), 13);
       label('Sun — you are here', sunS[0], sunS[1], mw * clamp((v - 17.2) / 0.6) * clamp(1 - (v - 19) / 0.5), 11, '#9fd0ff');
@@ -254,6 +297,9 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     if (lg > 0) {
       gal(ANDRO, ANDROMEDA, lg, '#ffe6c4', '#bcd2ff'); gal(TRI, TRIANGULUM, lg, '#fff0d8', '#b8d0ff');
       const a = P(ANDROMEDA), t = P(TRIANGULUM), l = P(LMC), sm = P(SMC);
+      hit('Andromeda', a[0], a[1], Math.max(1.05e18 * S * 0.7, 9), lg); hit('Triangulum', t[0], t[1], Math.max(3e17 * S, 7), lg);
+      hit('Large Magellanic Cloud', l[0], l[1], Math.max(1.4e17 * S, 6), lg * clamp(1 - (v - 19.6) / 0.4)); hit('Small Magellanic Cloud', sm[0], sm[1], Math.max(1e17 * S, 6), lg * clamp(1 - (v - 19.6) / 0.4));
+      if (v > 20.2) hit('Local Group', P(LG)[0], P(LG)[1], Math.max(5e19 * S * 0.5, 22), lg);
       glow(a[0], a[1], Math.max(1.05e18 * S * 0.3, 6), 'rgba(255,225,180,.6)', lg);
       [l, sm].forEach((q) => glow(q[0], q[1], Math.max(1.4e17 * S, 3), 'rgba(200,215,255,.7)', lg));
       label('Andromeda', a[0], a[1], lg * clamp(1 - (v - 21.2) / 0.5), 12.5); label('Triangulum', t[0], t[1], lg * clamp((v - 19.5) / 0.5) * clamp(1 - (v - 21) / 0.5), 11);
@@ -273,6 +319,7 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
       };
       drawWeb(WEB, S, wa * clamp(1 - (v - 25.6) / 1.2));
       const er = EDGE * S;
+      hit('Cosmic web', o[0], o[1], Math.max(W, H), wa); if (v > 23.2) hit('Observable universe', o[0], o[1], er * 1.08, clamp((v - 23.2) / 0.6));
       if (v > 23.2) {
         const ea = clamp((v - 23.2) / 0.6);
         const g = x.createRadialGradient(o[0], o[1], er * 0.96, o[0], o[1], er * 1.08);
@@ -298,10 +345,47 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     }
   }
 
+  /** The object under a point: the smallest one whose disc (with a finger's margin) contains it. */
+  const pick = (cx: number, cy: number) => {
+    const b = cv.current!.getBoundingClientRect(), px = cx - b.left, py = cy - b.top;
+    return hits.current.filter((h) => Math.hypot(h.x - px, h.y - py) <= Math.max(h.r, 8) + 12).sort((a, z) => a.r - z.r)[0]?.name ?? null;
+  };
   return (
     <>
-      <canvas ref={cv} className="cosmic-canvas" aria-hidden />
+      <canvas ref={cv} className="cosmic-canvas" aria-label="Space — tap a planet, star or galaxy for details"
+        onClick={(e) => setSel(pick(e.clientX, e.clientY))}
+        onMouseMove={(e) => { e.currentTarget.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : ''; }} />
       <div ref={cap} className="cosmic-caption" aria-live="polite" />
+      {sel && COSMOS[sel] && <CosmicCard name={sel} onClose={() => setSel(null)} />}
     </>
+  );
+}
+
+/** Details of a planet, star or galaxy: a real photo and summary (Wikipedia) and the key facts. */
+function CosmicCard({ name, onClose }: { name: string; onClose: () => void }) {
+  const info = COSMOS[name];
+  const [wiki, setWiki] = useState<{ text?: string; img?: string; url?: string } | null>(null);
+  const [imgBad, setImgBad] = useState(false);
+  useEffect(() => {
+    setWiki(null); setImgBad(false);
+    const ctl = new AbortController();
+    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(info.wiki)}`, { signal: ctl.signal })
+      .then((r) => r.json())
+      .then((j) => setWiki({ text: j.extract, img: (j.originalimage?.width ?? 0) > 0 && j.originalimage.width <= 1400 ? j.originalimage.source : j.thumbnail?.source, url: j.content_urls?.desktop?.page }))
+      .catch(() => undefined);
+    return () => ctl.abort();
+  }, [info.wiki]);
+  return (
+    <div className="cosmic-card" role="dialog" aria-label={name}>
+      <button type="button" className="cosmic-card-x" onClick={onClose} aria-label="Close">×</button>
+      {wiki?.img && !imgBad ? <img src={wiki.img} alt={name} referrerPolicy="no-referrer" onError={() => setImgBad(true)} /> : <div className="cosmic-card-ph" />}
+      <div className="cosmic-card-body">
+        <span className="tiny muted">{info.kind}</span>
+        <b>{name}</b>
+        <dl>{info.facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+        {wiki?.text && <p className="small">{wiki.text.length > 320 ? `${wiki.text.slice(0, 320).replace(/\s\S*$/, '')}…` : wiki.text}</p>}
+        {wiki?.url && <a className="tiny" href={wiki.url} target="_blank" rel="noopener noreferrer">Read more on Wikipedia →</a>}
+      </div>
+    </div>
   );
 }

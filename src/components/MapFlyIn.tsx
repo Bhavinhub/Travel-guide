@@ -986,7 +986,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const onSpaceDepth = (d: number) => {
     const mapEl = el.current, st = stageRef.current;
     if (mapEl) { mapEl.style.opacity = d > 0 ? String(Math.max(0, Math.min(1, 1 - (d - 0.04) / 0.3))) : ''; mapEl.style.visibility = d > 0.4 ? 'hidden' : ''; }
-    st?.style.setProperty('--sky-o', String(Math.max(0, Math.min(1, 1 - (d - 3) / 3))));
+    // The real Milky Way photo stays behind the stars (dimmed), and recedes once the camera leaves our galaxy.
+    st?.style.setProperty('--sky-o', String(Math.max(0.55 - 0.45 * Math.max(0, Math.min(1, (d - 12.6) / 1.2)), Math.min(1, 1 - (d - 3) / 3))));
     if ((d > 0.02) !== inSpaceRef.current) { inSpaceRef.current = d > 0.02; setInSpace(d > 0.02); }
   };
   // Leaving for space: take one picture of the globe as it is right now (read while the frame is still drawn).

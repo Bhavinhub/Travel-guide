@@ -1713,3 +1713,23 @@ html body .mapfly .cosmic-home { position: absolute; z-index: 8; left: 50%; bott
   background: linear-gradient(160deg, rgba(255,255,255,.2), rgba(255,255,255,.05) 50%, rgba(120,200,255,.1)); border: 1px solid rgba(255,255,255,.3);
   -webkit-backdrop-filter: blur(14px) saturate(1.6); backdrop-filter: blur(14px) saturate(1.6); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.5), 0 8px 22px rgba(0,0,0,.4); }
 .mapfly.is-space .mapfly-route, .mapfly.is-space .mapfly-hint, .mapfly.is-space .mapfly-route-form, .mapfly.is-space .mf-card { opacity: 0; pointer-events: none; transition: opacity .3s; }
+/* Space: details of a tapped planet, star or galaxy (water-glass card). */
+.cosmic-card { position: absolute; z-index: 9; right: .75rem; top: .75rem; width: min(330px, calc(100% - 1.5rem)); max-height: calc(100% - 5.5rem); overflow: auto; border-radius: 18px; color: #fff;
+  background: linear-gradient(160deg, rgba(255,255,255,.18), rgba(255,255,255,.05) 45%, rgba(120,200,255,.08)); border: 1px solid rgba(255,255,255,.28);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.5), 0 18px 40px rgba(0,0,0,.55); animation: cosmicCardIn .35s var(--ease, ease-out) both; }
+@keyframes cosmicCardIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.cosmic-card img, .cosmic-card-ph { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 17px 17px 0 0; background: radial-gradient(circle at 50% 40%, #233456, #05070c); }
+.cosmic-card-body { display: grid; gap: .35rem; padding: .7rem .9rem .9rem; }
+.cosmic-card-body b { font: 700 1.15rem/1.2 var(--font-display, system-ui); }
+.cosmic-card-body .muted { color: #b9c8da; }
+.cosmic-card dl { display: grid; gap: .2rem; margin: .2rem 0; }
+.cosmic-card dl > div { display: flex; justify-content: space-between; gap: .8rem; font-size: .8rem; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: .2rem; }
+.cosmic-card dt { color: #b9c8da; } .cosmic-card dd { margin: 0; text-align: right; font-weight: 600; }
+.cosmic-card p { margin: .2rem 0 0; color: #e6edf5; line-height: 1.45; }
+.cosmic-card a { color: #f4c878; }
+.cosmic-card-x { all: unset; cursor: pointer; position: absolute; right: .5rem; top: .5rem; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; font-size: 1.2rem; color: #fff; background: rgba(0,0,0,.45); }
+@media (max-width: 600px) { .cosmic-card { top: auto; bottom: 3.6rem; left: .6rem; right: .6rem; width: auto; max-height: 62%; } .cosmic-card img, .cosmic-card-ph { aspect-ratio: 16 / 8; } }
+/* While a space card is open, the zoom buttons step aside (they would sit on the card). */
+.mapfly:has(.cosmic-card) .mapfly-zoom { opacity: 0; pointer-events: none; }
+.cosmic-card img { object-fit: contain; background: #000; }
