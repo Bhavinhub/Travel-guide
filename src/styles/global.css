@@ -1583,3 +1583,17 @@ html[data-theme='light'] .cursor-ring[data-mode='link'] { border-color: rgba(200
 html[data-motion='reduced'] .cursor-ring { display: none; }
 /* In-page jumps ("Fly to the map ↓", "Jump to destinations ↓", chapter links) stop below the floating header. */
 main [id], main section, main h2 { scroll-margin-top: calc(var(--nav-h) + 28px); }
+
+/* Map fits the screen that is actually visible on phones (100vh includes the area behind the browser bars). */
+.mapfly-sticky { height: calc(100vh - var(--nav-h)); height: calc(100svh - var(--nav-h)); }
+.mapfly.is-static .mapfly-sticky, .mapfly.is-free:not(.is-static) .mapfly-sticky { height: calc(100svh - var(--nav-h)); }
+/* Globe level: smaller destination photos, local sights hidden (they piled up into one blob). */
+.mapfly-map.is-globe .map-dest img { width: 24px; height: 24px; border-width: 1.5px; }
+.mapfly-map.is-globe .map-tour, .mapfly-map.is-globe .map-photo:not(.map-origin):not(.map-dest) { display: none; }
+/* The destination pin always sits above the other photo markers, and the vehicle steps aside on arrival. */
+.maplibregl-marker.map-pin { z-index: 4; }
+.maplibregl-marker.map-mover { z-index: 3; transition: opacity .5s var(--ease), filter .5s; }
+html body .map-mover.is-parked { opacity: 0 !important; pointer-events: none; } /* MapLibre sets opacity inline */
+.mapfly-map.is-globe .map-dest { opacity: .8; }
+/* Phones: a long multi-leg summary stays compact so the map is not hidden behind it. */
+@media (max-width: 600px) { html body .mapfly .mapfly-route { font-size: .72rem; line-height: 1.3; padding: .3rem .75rem; } }

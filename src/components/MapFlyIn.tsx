@@ -350,6 +350,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const freeRef = useRef(false);
   freeRef.current = free;
   const [playing, setPlaying] = useState(false);
+  const arriveZoom = Math.min(zoomTo - 1, 14.4); // the landed view: the place with its town around it
   const playRef = useRef(false);
   const { reduced } = useMotion();
   const fromKey = from ? `${from.name}|${from.lat},${from.lon}` : '';
@@ -358,6 +359,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const restingRef = useRef(false);
   const nearStop = useRef(false);
   const held = useRef<number | null>(null);
+  const padRef = useRef<() => void>(() => undefined);
   const perf = useRef({ last: 0, sum: 0, n: 0, ratio: Math.min(window.devicePixelRatio || 1, 1.25) });
   const restTimer = useRef(0);
   /** Turn 3D terrain on after the camera has rested close to the ground for a moment. */
@@ -402,7 +404,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     const m = new maplibregl.Map({
       container: el.current!,
       center: [lon, lat],
-      zoom: reduced ? zoomTo : 0.9,
+      zoom: reduced ? arriveZoom : globeZoom(),
       pitch: 0,
       maxPitch: 80,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 1.25),
@@ -495,6 +497,23 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       if (had) m.once('idle', () => { if (restingRef.current && !terrainOn.current && map.current === m) { terrainOn.current = true; m.setTerrain({ source: 'dem', exaggeration: 1.3 }); } });
     });
     ro.observe(el.current!);
+    // The From/To panel, route summary and options button cover parts of the map: centre everything
+    // (the globe, the journey, the arrival) in the space that is actually visible.
+    const fitPadding = () => {
+      const host = el.current?.closest('.mapfly-sticky') as HTMLElement | null;
+      if (!host) return;
+      const hb = host.getBoundingClientRect();
+      const bottomOf = (sel: string) => { const n = host.querySelector(sel) as HTMLElement | null; return n && n.offsetParent ? n.getBoundingClientRect().bottom - hb.top : 0; };
+      const top = Math.max(bottomOf('.mapfly-route-form'), bottomOf('.mapfly-route'));
+      const ui = host.querySelector('.mapfly-ui') as HTMLElement | null;
+      const bottom = ui ? hb.bottom - ui.getBoundingClientRect().top : 0;
+      const clamp2 = (v: number) => Math.max(0, Math.min(hb.height * 0.35, v));
+      m.setPadding({ top: clamp2(top + 8), bottom: clamp2(bottom + 8), left: 0, right: 0 });
+    };
+    m.on('load', fitPadding);
+    padRef.current = fitPadding;
+    const ro2 = new ResizeObserver(fitPadding);
+    ro2.observe(el.current!);
     // Imagery credit: required by the providers, so it stays — but folded into the small ⓘ (tap to read it).
     let creditOpened = false;
     const foldCredit = () => {
@@ -511,7 +530,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     map.current = m;
     prefetchArrival(lat, lon); // the close-up at the destination is ready before the camera gets there
     if (import.meta.env.DEV) (window as unknown as { __map: maplibregl.Map }).__map = m;
-    return () => { clearTimeout(fallback); ro.disconnect(); ready.current = false; terrainOn.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
+    return () => { clearTimeout(fallback); ro.disconnect(); ro2.disconnect(); ready.current = false; terrainOn.current = false; m.remove(); map.current = null; routeRef.current = null; mover.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [near, lat, lon, name]);
 
@@ -622,6 +641,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromKey, lat, lon, near, travel]);
 
+  /** Whole-Earth zoom: the globe fills more of a wide laptop frame, and fits a phone. */
+  const globeZoom = () => ((el.current?.clientWidth ?? 400) > 900 ? 1.5 : 0.9);
   /** The 3D camera for journey progress p (0 = whole Earth, 1 = landed at the place). */
   const applyCamera = (p: number) => {
     const m = map.current;
@@ -643,15 +664,15 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     let center: [number, number], zoom: number, pitch: number, bearing = 0;
     if (!rr) {
       const e = smooth(p);
-      center = [lon, lat]; zoom = lerp(0.9, zoomTo, e); pitch = lerp(0, 55, smooth(clamp((p - 0.45) / 0.55)));
+      center = [lon, lat]; zoom = lerp(globeZoom(), arriveZoom, e); pitch = lerp(0, 55, smooth(clamp((p - 0.45) / 0.55)));
       bearing = lerp(0, -25, e);
     } else {
       const follow = Math.max(rr.fit.zoom, Math.min(rr.fit.zoom + 1.6, 11, zoomTo - 1));
       if (p < 0.18) {
         // Whole Earth → the route region, spinning the globe towards it.
         const e = smooth(p / 0.18);
-        center = [lerp(rr.fit.center[0] - 40, rr.fit.center[0], e), lerp(rr.fit.center[1] - 10, rr.fit.center[1], e)];
-        zoom = lerp(0.9, rr.fit.zoom, e); pitch = lerp(0, 20, e);
+        center = [lerp(rr.fit.center[0] - 12, rr.fit.center[0], e), lerp(rr.fit.center[1] - 4, rr.fit.center[1], e)];
+        zoom = lerp(globeZoom(), rr.fit.zoom, e); pitch = lerp(0, 20, e);
         setDone('start'); mover.current?.setLngLat([rr.r.pts[0][1], rr.r.pts[0][0]]);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       } else if (p < 0.85) {
@@ -689,12 +710,14 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       } else {
         // Arrive: dolly in and orbit down onto the place.
         const e = smooth((p - 0.85) / 0.15);
-        // Close enough to see the place itself, high enough to read the cafés, sights and streets around it.
-        center = [lon, lat]; zoom = lerp(follow, Math.min(zoomTo, 15.4), e); pitch = lerp(52, 50, e); bearing = lerp(0, -20, e);
+        // Close enough to see the place itself, high enough to see the town around it (not one street).
+        center = [lon, lat]; zoom = lerp(follow, Math.max(follow, arriveZoom), e); pitch = lerp(52, 44, e); bearing = lerp(0, -20, e);
         setDone('end'); mover.current?.setLngLat([lon, lat]);
         if (cardRef.current !== -1) { cardRef.current = -1; setCard(-1); }
       }
     }
+    // Once landed, the vehicle steps aside so the destination pin and its name are what you see.
+    mover.current?.getElement().classList.toggle('is-parked', !!rr && p > 0.93);
     m.jumpTo({ center, zoom, pitch, bearing });
     // Keep the flight fluid on any device: if frames run long, render the map at a lower resolution.
     const now = performance.now(), gap = now - perf.current.last;
@@ -712,6 +735,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     // and rises in once the camera rests near the ground (see setTerrainWhenResting).
     if (terrainOn.current && (p < 0.9 || (!restingRef.current && p < 0.97))) { terrainOn.current = false; m.setTerrain(null); }
     el.current?.classList.toggle('is-close', zoom > 8.5);
+    el.current?.classList.toggle('is-globe', zoom < 3.2);
   };
   const camRef = useRef(applyCamera);
   camRef.current = applyCamera;
@@ -877,6 +901,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       ? `${route.legs.map((l) => `${VEHICLE[l.travel].icon} ${l.title ?? VEHICLE[l.travel].label} · ${Math.round(l.km).toLocaleString('en-IN')} km · ${hm(l.hours)}`).join('  →  ')}  ·  total about ${hm(route.hours)}${route.note ? `  ·  ${route.note}` : ''}`
       : `${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].icon} ${VEHICLE[route.travel ?? (route.mode === 'air' ? 'flight' : 'car')].label} from ${from.name} · ${Math.round(route.km - (route.walkKm ?? 0)).toLocaleString('en-IN')} km${route.hours ? ` · ${hm(route.hours)}` : ''}${route.walkKm ? `  ·  🥾 Trek ${route.walkKm.toFixed(1)} km · ${hm(route.walkHours)}` : ''}${route.note ? `  ·  ${route.note}` : ''}`)
     : null;
+
+  useEffect(() => { requestAnimationFrame(() => padRef.current()); }, [routeLabel]);
 
   return (
     <>
