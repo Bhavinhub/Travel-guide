@@ -1,5 +1,5 @@
 # Cloudflare Pages: static site from dist/ plus the /api/quote function (functions/).
-name = "travelguide"
+name = "travelguideworld"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-09-01"
 

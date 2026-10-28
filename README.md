@@ -1,6 +1,6 @@
 # Travel Guide
 
-**Live site:** https://travelguide-enw.pages.dev
+**Live site:** https://travelguideworld.pages.dev
 
 **Explore beautifully. Plan effortlessly.**
 
@@ -170,7 +170,7 @@ See `CREDITS.md` for media, data and audio credits, and `docs/DATA.md` for the d
 
 ## Deployment (Cloudflare Pages)
 
-- Hosted on **Cloudflare Pages** (project `travelguide`). Build locally and upload the static output:
+- Hosted on **Cloudflare Pages** (project `travelguideworld`). Build locally and upload the static output:
   `npm run build && npx wrangler pages deploy dist --project-name travelguide`
 - **Headers** (security + caching) live in `public/_headers`.
 - **Quote requests** go to the Pages Function `functions/api/quote.js`, stored in Workers KV (`travel-guide-quotes`, binding `QUOTES`, configured in `wrangler.toml`). View them in the Cloudflare dashboard → Storage & Databases → KV. Sealed ones decrypt offline with `scripts/decrypt-quote.mjs`.
