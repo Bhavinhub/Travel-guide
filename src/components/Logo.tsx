@@ -1,3 +1,4 @@
+import { useState, type CSSProperties } from 'react';
 import { COMPANY } from '../config/company';
 
 /**
@@ -19,9 +20,14 @@ export function LogoMark({ size = 36, title }: { size?: number; title?: string }
   );
 }
 
+/**
+ * The name in watery-glass letters, in a new colour every time a page opens (a random turn of the colour
+ * wheel). The colour is set once rather than animated, so the header never repaints while you browse.
+ */
 export function Wordmark() {
+  const [hue] = useState(() => Math.round(Math.random() * 360));
   return (
-    <span className="wordmark" aria-label={COMPANY.name}>
+    <span className="wordmark" aria-label={COMPANY.name} style={{ '--wm-hue': `${hue}deg` } as CSSProperties}>
       <span className="wm-a" data-text="Travel">Travel</span> <span className="wm-b" data-text="Guide">Guide</span>
     </span>
   );

@@ -99,29 +99,38 @@ export default function Home() {
   // Scroll → active chapter + progress bar (finite: clamps at the final chapter).
   useEffect(() => {
     let raf = 0;
+    // Section positions and page height are measured only when the layout changes (resize, content loading
+    // in) — reading them on every scroll frame forced the browser to recompute the whole page each time.
+    let tops: number[] = [], max = 1, vh = innerHeight, sy = scrollY; // sy: read in the scroll event (free there)
+    const measure = () => {
+      vh = innerHeight;
+      tops = (sections.current.filter(Boolean) as HTMLElement[]).map((el) => el.offsetTop);
+      max = Math.max(1, document.documentElement.scrollHeight - vh);
+    };
+    let lastActive = -1;
     const compute = () => {
       raf = 0;
-      const els = sections.current.filter(Boolean) as HTMLElement[];
-      if (!els.length) return;
-      const y = window.scrollY + window.innerHeight * 0.45;
+      if (!tops.length) return;
+      const y = sy + vh * 0.45;
       let i = 0;
-      while (i < els.length - 1 && y >= els[i + 1].offsetTop) i++;
+      while (i < tops.length - 1 && y >= tops[i + 1]) i++;
       // Continuous chapter progress (e.g. 2.4 = 40% of the way from scene 3 to scene 4) scrubs the dolly.
-      const start = els[i].offsetTop;
-      const next = i < els.length - 1 ? els[i + 1].offsetTop : start;
-      // Hold the camera on each photo for the first part of its section, then dolly to the next.
-      const raw = Math.min(1, Math.max(0, (scrollY - start) / Math.max(1, next - start)));
+      const start = tops[i];
+      const next = i < tops.length - 1 ? tops[i + 1] : start;
+      const raw = Math.min(1, Math.max(0, (sy - start) / Math.max(1, next - start)));
       // Continuous: the camera keeps gliding the whole time the visitor scrolls (no hold, then jump).
-      dolly.progress = i < els.length - 1 ? i + raw : i;
-      const max = document.documentElement.scrollHeight - innerHeight;
-      if (bar.current) bar.current.style.transform = `scaleX(${Math.min(1, scrollY / Math.max(1, max))})`;
-      setActive(i);
+      dolly.progress = i < tops.length - 1 ? i + raw : i;
+      if (bar.current) bar.current.style.transform = `scaleX(${Math.min(1, sy / max).toFixed(4)})`;
+      if (i !== lastActive) { lastActive = i; setActive(i); }
     };
-    const on = () => { if (!raf) raf = requestAnimationFrame(compute); };
-    compute();
+    const on = () => { sy = scrollY; if (!raf) raf = requestAnimationFrame(compute); };
+    const remeasure = () => { measure(); on(); };
+    measure(); compute();
     addEventListener('scroll', on, { passive: true });
-    addEventListener('resize', on);
-    return () => { removeEventListener('scroll', on); removeEventListener('resize', on); cancelAnimationFrame(raf); };
+    addEventListener('resize', remeasure);
+    const ro = new ResizeObserver(remeasure);
+    ro.observe(document.body);
+    return () => { removeEventListener('scroll', on); removeEventListener('resize', remeasure); ro.disconnect(); cancelAnimationFrame(raf); };
   }, []);
 
   useEffect(() => {

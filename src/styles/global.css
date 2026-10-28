@@ -1733,3 +1733,36 @@ html body .mapfly .cosmic-home { position: absolute; z-index: 8; left: 50%; bott
 /* While a space card is open, the zoom buttons step aside (they would sit on the card). */
 .mapfly:has(.cosmic-card) .mapfly-zoom { opacity: 0; pointer-events: none; }
 .cosmic-card img { object-fit: contain; background: #000; }
+
+/* ── Smoothness: nothing repaints when nobody is doing anything ─────────────────────────────────── */
+/* Wordmark: colour chosen per page view (--wm-hue), drawn once; the liquid shine runs only on hover. */
+html body .wordmark .wm-a, html body .wordmark .wm-b, html[data-theme='light'] body .wordmark .wm-a, html[data-theme='light'] body .wordmark .wm-b {
+  animation: none; background-position: 30% 0;
+  filter: hue-rotate(var(--wm-hue, 0deg)) drop-shadow(0 1px 0 rgba(255,255,255,.4)) drop-shadow(0 2px 0 rgba(20,40,90,.55)) drop-shadow(0 5px 8px rgba(0,0,0,.45));
+}
+html body .wordmark .wm-b { background-position: 75% 0; }
+html body .brand:hover .wordmark .wm-a, html body .brand:hover .wordmark .wm-b { animation: wmFlow 2.4s ease-out 1; }
+/* The footer (and its logo) is skipped by the browser until it scrolls into view. */
+.footer { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+/* Live dot and the travelling vehicle: pulse with a scaled ring (compositor only) instead of a repainted shadow. */
+.live-dot { animation: none; position: relative; box-shadow: none; }
+.live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: rgba(74,222,128,.55); animation: ringOut 1.8s ease-out infinite; }
+html body .map-mover { animation: none; }
+html body .map-mover::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid rgba(244,184,96,.55); animation: ringOut 1.8s ease-out infinite; pointer-events: none; }
+@keyframes ringOut { to { transform: scale(2.2); opacity: 0; } }
+html[data-motion='reduced'] :is(.live-dot, .map-mover)::after { animation: none; }
+/* Phones: the slow "breathing" zooms on background photos are switched off (they keep the GPU busy all the time). */
+@media (pointer: coarse), (max-width: 760px) {
+  .pd-breathe, .pd-layer img.is-loaded, .zoom-loop, .dhero .bg img, .mapfly .mf-space { animation: none !important; }
+}
+/* The footer is plain again (content-visibility made it leave and re-enter layout every frame); its logo
+   just doesn't animate — the header's does. */
+.footer { content-visibility: visible; contain-intrinsic-size: none; }
+.footer .logo-globe, .footer .logo-globe * { animation: none !important; }
+.dest-list a:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); } .dest-list a:focus-visible { outline: 3px solid var(--sun); }
+/* Phones: the logo Earth keeps turning (a compositor-only transform), its little plane rests on the orbit —
+   flying it along a path repaints the header every frame. */
+@media (pointer: coarse), (max-width: 760px) {
+  .lg-plane, .lg-plane-orbit { animation: none !important; }
+  .lg-plane { offset-distance: 22%; }
+}

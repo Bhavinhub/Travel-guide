@@ -58,10 +58,23 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
     if (!n) return;
     const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
     let raf = 0, cur = 0, target = 0, mx = 0, my = 0, cmx = 0, cmy = 0, lastT = performance.now(), lastWarm = -99;
+    // Smooth on phones: every style write invalidates layout for the scene, so a value is written only when it
+    // changes, only the scenes near the camera are visited, and the page height is measured only on resize.
+    const last = new WeakMap<HTMLElement, Record<string, string>>();
+    const put = (el: HTMLElement, prop: 'transform' | 'opacity' | 'display' | 'zIndex', v: string) => {
+      let m = last.get(el); if (!m) last.set(el, (m = {}));
+      if (m[prop] !== v) { m[prop] = v; el.style[prop] = v; }
+    };
+    // Screen size and page height: read on resize only. On phones even reading innerWidth after a style write
+    // makes the browser recompute every element's style, so the frame never touches them.
+    let maxScroll = 1, vw = innerWidth, vh = innerHeight;
+    const measure = () => { vw = innerWidth; vh = innerHeight; maxScroll = Math.max(1, document.documentElement.scrollHeight - vh); };
+    measure();
+    let heroW = 0, heroH = 0; // the hero photo's box, read outside the frame (reading it mid-frame forces a layout)
+    const live = new Set<number>(); // scenes on screen (or on standby) after the last frame
     const read = () => {
       if (source) { target = Math.min(n - 1, Math.max(0, source.progress)); return; }
-      const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
-      target = Math.min(1, Math.max(0, scrollY / max)) * (n - 1);
+      target = Math.min(1, Math.max(0, scrollY / maxScroll)) * (n - 1);
     };
     const frame = () => {
       raf = 0;
@@ -71,9 +84,8 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
       cur += (target - cur) * (reduced ? 1 : 1 - Math.exp(-dt * 2.4)); // slow, soft camera glide
       if (Math.abs(target - cur) < 0.0005) cur = target;
       cmx += (mx - cmx) * 0.07; cmy += (my - cmy) * 0.07;
-      if (camera.current) camera.current.style.transform = `perspective(1100px) rotateY(${(cmx * 6).toFixed(3)}deg) rotateX(${(-cmy * 4).toFixed(3)}deg) translate3d(${(-cmx * 26).toFixed(1)}px, ${(-cmy * 18).toFixed(1)}px, 0)`;
+      if (camera.current) put(camera.current, 'transform', `perspective(1100px) rotateY(${(cmx * 6).toFixed(3)}deg) rotateX(${(-cmy * 4).toFixed(3)}deg) translate3d(${(-cmx * 26).toFixed(1)}px, ${(-cmy * 18).toFixed(1)}px, 0)`);
       const ci = Math.floor(cur), f = cur - ci;
-      const vw = innerWidth, vh = innerHeight;
       // Pre-load the scenes around the camera (small copy first, then the sharp one).
       if (ci !== lastWarm) {
         lastWarm = ci;
@@ -92,8 +104,8 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
       // A full photograph fills the space around the floating hero; the next scene covers it as the camera pushes in.
       if (heroBg.current) {
         const show = cur < 1;
-        heroBg.current.style.display = show ? '' : 'none';
-        if (show) heroBg.current.style.transform = `scale(${(1.04 + cur * 0.12).toFixed(4)}) translate3d(${(-cmx * 14).toFixed(1)}px, ${(-cmy * 10).toFixed(1)}px, 0)`;
+        put(heroBg.current, 'display', show ? '' : 'none');
+        if (show) put(heroBg.current, 'transform', `scale(${(1.04 + cur * 0.12).toFixed(4)}) translate3d(${(-cmx * 14).toFixed(1)}px, ${(-cmy * 10).toFixed(1)}px, 0)`);
       }
       // Floating world photos: each sits somewhere on a long flight path; scrolling flies the camera
       // forward through them (they grow and spread outwards as they pass), scrolling up flies back.
@@ -105,16 +117,21 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
         const fadeIn = Math.min(1, (1 - d) / 0.18), fadeOut = Math.min(1, Math.max(0, (dist - 0.2) / 0.22));
         const heroCalm = hero ? smooth(Math.min(1, Math.max(0, (cur - 0.22) / 0.4))) : 1; // on opening only the hero photo shows; the world photos join as you scroll
         const o = Math.max(0, Math.min(1, fadeIn * fadeOut * heroCalm));
-        el.style.opacity = o.toFixed(3);
-        el.style.display = o < 0.01 ? 'none' : '';
+        put(el, 'opacity', o.toFixed(2));
+        put(el, 'display', o < 0.01 ? 'none' : '');
         if (o >= 0.01) {
           const R = Math.min(vw, vh) * 0.62 * spot.r * sc;
           const x = Math.cos(spot.a) * R * (vw / Math.min(vw, vh)) * 0.8 - cmx * 70 * sc, y = Math.sin(spot.a) * R * 0.75 - cmy * 50 * sc;
-          el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${sc.toFixed(4)}) rotate(${(Math.cos(spot.a * 3) * 4).toFixed(2)}deg)`;
-          el.style.zIndex = String(3 + Math.round(sc * 10));
+          put(el, 'transform', `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${sc.toFixed(3)}) rotate(${(Math.cos(spot.a * 3) * 4).toFixed(2)}deg)`);
+          put(el, 'zIndex', String(3 + Math.round(sc * 10)));
         }
       });
-      layers.current.forEach((el, i) => {
+      // Only the scenes around the camera, plus any still showing from the last frame (to hide them).
+      const visit = new Set<number>(live);
+      for (let i = Math.max(0, i0 - 1); i <= Math.min(n - 1, i0 + 2); i++) visit.add(i);
+      live.clear();
+      visit.forEach((i) => {
+        const el = layers.current[i];
         if (!el) return;
         let o = 0, s = 1, z = 0;
         if (i === i0) { o = nextReady ? 1 - smooth(Math.max(0, (f - 0.68) / 0.32)) : 1; s = 1 + Math.max(0, f - 0.6) * ZOOM * 0.5; z = i0 === ci ? f : 0; } // slow zoom across the whole stretch, gentle dissolve at the end (only once the next scene has loaded)
@@ -125,21 +142,22 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
         if (img && hero && i === 0) {
           // The hero starts further back — the whole photo, framed in space — and the camera pushes in
           // until it fills the screen, then on towards the next scene.
-          const w = img.offsetWidth || 1, h = img.offsetHeight || 1;
-          const cover = Math.max(vw / w, vh / h) * 1.04;
-          img.style.transform = `scale(${(0.86 + (cover * 1.18 - 0.86) * smooth(Math.min(1, z / 0.85))).toFixed(4)})`;
+          if (!heroW) { heroW = img.offsetWidth || vw; heroH = img.offsetHeight || vh; } // read once (0 when hidden)
+          const cover = Math.max(vw / heroW, vh / heroH) * 1.04;
+          put(img, 'transform', `scale(${(0.86 + (cover * 1.18 - 0.86) * smooth(Math.min(1, z / 0.85))).toFixed(4)})`);
         } else if (img) {
           const k = z; // linear: the zoom keeps moving steadily with the scroll
-          img.style.transform = `scale(${(1 + 0.24 * k).toFixed(4)})`; // widest framing at rest → in towards the next scene
+          put(img, 'transform', `scale(${(1 + 0.24 * k).toFixed(4)})`); // widest framing at rest → in towards the next scene
         }
         const drift = i === i0 ? f : i === i0 + 1 ? f - 1 : 0; // a gentle cinematic drift between scenes
         const show = o > 0.001;
         // The scenes either side stay rendered (invisible) so their photos are already decoded when the camera
         // reaches them — phones discard hidden images, and the first frame of a re-shown one flashes blank.
         const standby = !show && (i === i0 - 1 || i === i0 + 2) && ready(i);
-        el.style.display = show || standby ? '' : 'none';
-        if (standby) { el.style.opacity = '0'; el.style.zIndex = '0'; }
-        if (show) { el.style.opacity = o.toFixed(3); el.style.transform = `translate3d(${(drift * -18).toFixed(1)}px, ${(drift * -10).toFixed(1)}px, 0) rotate(${(drift * 0.6).toFixed(3)}deg) scale(${s.toFixed(4)})`; el.style.zIndex = String(i === i0 ? 2 : 1); }
+        put(el, 'display', show || standby ? '' : 'none');
+        if (show || standby) live.add(i);
+        if (standby) { put(el, 'opacity', '0'); put(el, 'zIndex', '0'); }
+        if (show) { put(el, 'opacity', o.toFixed(3)); put(el, 'transform', `translate3d(${(drift * -18).toFixed(1)}px, ${(drift * -10).toFixed(1)}px, 0) rotate(${(drift * 0.6).toFixed(3)}deg) scale(${s.toFixed(4)})`); put(el, 'zIndex', String(i === i0 ? 2 : 1)); }
       });
       const settled = cur === target && (!source || Math.abs(source.progress - cur) < 0.0005) && Math.abs(mx - cmx) < 0.001 && Math.abs(my - cmy) < 0.001;
       if (!reduced && !settled) raf = requestAnimationFrame(frame);
@@ -151,16 +169,17 @@ export function PageDolly({ ids = [], photos, source, field = [], hero = false, 
     const onScroll = () => { if (document.documentElement.classList.contains('map-in-view')) return; read(); kick(); if (source) requestAnimationFrame(() => requestAnimationFrame(() => { read(); kick(); })); };
     const onMove = (e: PointerEvent) => {
       if (reduced || !fine || e.pointerType !== 'mouse') return;
-      mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; kick();
+      mx = e.clientX / vw - 0.5; my = e.clientY / vh - 0.5; kick();
     };
     read(); cur = target; frame();
     addEventListener('scroll', onScroll, { passive: true });
-    addEventListener('resize', onScroll);
+    const onResize = () => { measure(); heroW = 0; onScroll(); };
+    addEventListener('resize', onResize);
     addEventListener('pointermove', onMove, { passive: true });
     // Page height changes as lazy content loads — re-read, but at most once per frame.
-    const ro = new ResizeObserver(onScroll);
+    const ro = new ResizeObserver(() => { measure(); onScroll(); });
     ro.observe(document.body);
-    return () => { cancelAnimationFrame(raf); removeEventListener('scroll', onScroll); removeEventListener('resize', onScroll); removeEventListener('pointermove', onMove); ro.disconnect(); };
+    return () => { cancelAnimationFrame(raf); removeEventListener('scroll', onScroll); removeEventListener('resize', onResize); removeEventListener('pointermove', onMove); ro.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n, reduced, key]);
 

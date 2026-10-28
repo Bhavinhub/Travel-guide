@@ -7,6 +7,7 @@ import { useMedia } from '../lib/media';
 import { href, navigate } from '../lib/router';
 import { useMotion, useStore } from '../lib/store';
 import { webglAvailable } from '../lib/interactions';
+import { placeHref, searchAnywhere, type PlaceHit } from '../lib/places';
 import { DestImage } from './DestImage';
 import { Illustration } from './Illustration';
 
@@ -162,6 +163,38 @@ export function DestinationFinder({ scope, title, onOpen }: { scope: 'india' | '
   const [globeVisible, setGlobeVisible] = useState(false);
   const base = useMemo(() => DESTINATIONS.filter((d) => scope === 'all' || d.scope === scope), [scope]);
   const list = useMemo(() => filterDestinations(searchDestinations(q, base), { interests, maxDays, budget, month }), [q, base, interests, maxDays, budget, month]);
+  // Not in the curated list (e.g. "Spiti Valley")? Look the place up anywhere, like the header search does.
+  const [more, setMore] = useState<PlaceHit[]>([]);
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 3 || list.length >= 3) { setMore([]); return; }
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      searchAnywhere(term, ctl.signal).then((hits) => {
+        // Real places (with a map position) whose name contains the searched word, best name match first.
+        const norm = (x = '') => x.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+        const want = norm(term), word = want.split(/\s+/)[0];
+        const known = new Set(list.map((d) => norm(d.name)));
+        const seen = new Set<string>();
+        const fresh = hits.filter((h) => {
+          const n = norm(h.name);
+          if (known.has(n) || seen.has(n) || h.lat == null || !new RegExp(`(^|[^a-z])${word.replace(/[.*+?^${}()|[\]\\]/g, '')}`).test(n)) return false;
+          seen.add(n); return true;
+        });
+        const safe = word.replace(/[^a-z0-9]/g, '');
+        const whole = (h: PlaceHit) => new RegExp(`(^|[^a-z])${safe}([^a-z]|$)`).test(norm(h.name));
+        const pool = fresh.some(whole) ? fresh.filter(whole) : fresh; // whole-word matches beat look-alikes
+        const score = (h: PlaceHit) => {
+          const n = norm(h.name);
+          const name = n === want ? 0 : whole(h) && n.startsWith(word) ? 1 : n.startsWith(word) ? 2 : 3;
+          const home = scope === 'india' ? (h.country === 'India' ? 0 : 4) : scope === 'world' ? (h.country === 'India' ? 4 : 0) : 0;
+          return name + home;
+        };
+        setMore(pool.sort((a, b) => score(a) - score(b)).slice(0, 6));
+      }).catch(() => undefined);
+    }, 250);
+    return () => { clearTimeout(t); ctl.abort(); };
+  }, [q, list, scope]);
   const canGlobe = !lightweight && !webglFailed && webglAvailable();
   const timer = useRef<number>();
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -235,8 +268,23 @@ export function DestinationFinder({ scope, title, onOpen }: { scope: 'india' | '
               </button>
             </div>
           ))}
-          {!list.length && <p className="muted small">No destinations match. Try removing a filter.</p>}
+          {!list.length && !more.length && <p className="muted small">No destinations match. Try removing a filter.</p>}
         </div>
+        {more.length > 0 && (
+          <div className="more-places">
+            <p className="small muted" style={{ margin: '0.8rem 0 0.4rem' }}>{list.length ? 'More places' : 'Places'} for “{q.trim()}” — full guide, map and photos</p>
+            <div className="dest-list" role="list">
+              {more.map((h) => (
+                <div role="listitem" key={`${h.name}-${h.lat}-${h.lon}`}>
+                  <a className="dest-more" href={href(placeHref(h))}>
+                    <span><b>{h.name}</b><br /><span className="tiny muted">{[h.region, h.country].filter(Boolean).join(', ')}</span></span>
+                    <span className="tag">Open</span>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

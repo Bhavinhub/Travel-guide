@@ -21,39 +21,37 @@ export interface StageChapter {
   video?: { src: string; poster?: string; credit: string; source: string };
 }
 
-/** Shared pointer + scroll state, smoothed every frame and exposed as CSS variables. */
+/**
+ * The cursor's position, smoothed and exposed as CSS variables (--mx, --my, -1…1) for gentle 3D tilts.
+ * Mouse only. Writing a variable on <html> restyles the whole page, so it is written only when it changes,
+ * and the loop stops as soon as the tilt has caught up with the cursor (it used to run every frame, forever).
+ */
 export function usePointerDepth(enabled: boolean) {
   useEffect(() => {
     const root = document.documentElement;
-    let tx = 0, ty = 0, x = 0, y = 0, sv = 0, lastY = scrollY, raf = 0;
-    const onMove = (e: PointerEvent) => {
-      tx = (e.clientX / innerWidth) * 2 - 1;
-      ty = (e.clientY / innerHeight) * 2 - 1;
-      root.style.setProperty('--cx', `${e.clientX}px`);
-      root.style.setProperty('--cy', `${e.clientY}px`);
-      root.style.setProperty('--hue', `${Math.round(((e.clientX / innerWidth) * 220 + scrollY * 0.05) % 360)}`);
+    const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    let tx = 0, ty = 0, x = 0, y = 0, raf = 0, wx = '', wy = '', vw = innerWidth, vh = innerHeight;
+    const put = () => {
+      const sx = x.toFixed(3), sy = y.toFixed(3);
+      if (sx !== wx) { wx = sx; root.style.setProperty('--mx', sx); }
+      if (sy !== wy) { wy = sy; root.style.setProperty('--my', sy); }
     };
     const tick = () => {
-      x += (tx - x) * 0.06;
-      y += (ty - y) * 0.06;
-      const v = scrollY - lastY;
-      lastY = scrollY;
-      sv += (Math.max(-60, Math.min(60, v)) - sv) * 0.1;
-      root.style.setProperty('--mx', x.toFixed(4));
-      root.style.setProperty('--my', y.toFixed(4));
-      root.style.setProperty('--sv', sv.toFixed(3));
-      raf = requestAnimationFrame(tick);
+      raf = 0;
+      x += (tx - x) * 0.06; y += (ty - y) * 0.06;
+      if (Math.abs(tx - x) < 0.001 && Math.abs(ty - y) < 0.001) { x = tx; y = ty; }
+      put();
+      if (x !== tx || y !== ty) raf = requestAnimationFrame(tick);
     };
-    if (enabled) {
-      addEventListener('pointermove', onMove, { passive: true });
-      raf = requestAnimationFrame(tick);
-    } else {
-      ['--mx', '--my', '--sv'].forEach((k) => root.style.setProperty(k, '0'));
-    }
-    return () => {
-      removeEventListener('pointermove', onMove);
-      cancelAnimationFrame(raf);
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      tx = (e.clientX / vw) * 2 - 1; ty = (e.clientY / vh) * 2 - 1;
+      if (!raf) raf = requestAnimationFrame(tick);
     };
+    const onResize = () => { vw = innerWidth; vh = innerHeight; };
+    put();
+    if (enabled && fine) { addEventListener('pointermove', onMove, { passive: true }); addEventListener('resize', onResize); }
+    return () => { removeEventListener('pointermove', onMove); removeEventListener('resize', onResize); cancelAnimationFrame(raf); };
   }, [enabled]);
 }
 

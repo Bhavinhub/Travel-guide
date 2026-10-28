@@ -33,12 +33,12 @@ void main() {
     float l = life[i];
     if (l <= 0.) continue;
     vec2 diff = (uv - pts[i].xy) * vec2(aspect, 1.);
-    float r = .085 + .07 * (1. - l);              // each blob widens as it fades, like spreading liquid
+    float r = .06 + .05 * (1. - l);               // each blob widens as it fades, like spreading liquid
     float f = exp(-dot(diff, diff) / (r * r)) * l * l;
     d += pts[i].zw * f;
   }
   vec2 q = clamp(uv - d, 0., 1.);
-  float k = clamp(length(d) * 2.4, 0., .055);       // rainbow split only where the image bends
+  float k = clamp(length(d) * 1.1, 0., .016);       // a hint of rainbow only where the image bends
   vec2 dir = normalize(d + 1e-6) * k;
   float rC = texture2D(tex, cover(clamp(q + dir, 0., 1.))).r;
   float gC = texture2D(tex, cover(q)).g;
@@ -53,7 +53,7 @@ export function LiquidHover() {
     const canvas = document.createElement('canvas');
     canvas.className = 'liquid-canvas';
     canvas.setAttribute('aria-hidden', 'true');
-    const gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: false, alpha: false });
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false });
     if (!gl) return;
 
     const sh = (type: number, src: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s); return s; };
@@ -84,7 +84,13 @@ export function LiquidHover() {
       return sources.get(src)!;
     };
 
-    let target: HTMLImageElement | null = null, ready = false, nat = [1, 1], raf = 0;
+    let target: HTMLImageElement | null = null, ready = false, nat = [1, 1], raf = 0, checked = false, broken = false, ref = -1;
+    const avg = (px: Uint8Array | Uint8ClampedArray, step: number) => { let t = 0, n = 0; for (let i = 0; i < px.length; i += step) { t += px[i] + px[i + 1] + px[i + 2]; n += 3; } return t / Math.max(1, n); };
+    const looksRight = (w: number, h: number) => {
+      const px = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const got = avg(px, 4 * 7);
+      return ref < 0 || Math.abs(got - ref) < 55;
+    };
     const pts: { x: number; y: number; vx: number; vy: number; t: number }[] = [];
     const ptsArr = new Float32Array(MAX_PTS * 4), lifeArr = new Float32Array(MAX_PTS);
 
@@ -97,7 +103,8 @@ export function LiquidHover() {
         gl.bindTexture(gl.TEXTURE_2D, tex);
         try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, im); } catch { detach(); return; }
         nat = [im.naturalWidth, im.naturalHeight];
-        ready = true; kick();
+        try { const c2 = document.createElement('canvas'); c2.width = 24; c2.height = 24; const x2 = c2.getContext('2d')!; x2.drawImage(im, 0, 0, 24, 24); ref = avg(x2.getImageData(0, 0, 24, 24).data, 4); } catch { ref = -1; }
+        ready = true; checked = false; kick();
       });
     };
     // Keep the canvas exactly over the photo: same box, same crop, same rounding and any transform the photo has.
@@ -108,7 +115,8 @@ export function LiquidHover() {
       canvas.style.width = `${img.offsetWidth}px`; canvas.style.height = `${img.offsetHeight}px`;
       canvas.style.borderRadius = cs.borderRadius; canvas.style.transform = cs.transform === 'none' ? '' : cs.transform;
       canvas.style.translate = cs.translate === 'none' ? '' : cs.translate; canvas.style.scale = cs.scale === 'none' ? '' : cs.scale;
-      canvas.style.filter = cs.filter === 'none' ? '' : cs.filter; // same colour grade as the photo, so nothing flickers
+      // No CSS filter on the canvas: on some Macs a filtered WebGL canvas composites as a white sheet.
+      canvas.style.filter = 'none';
       const dpr = Math.min(devicePixelRatio || 1, 1.5);
       const w = Math.max(1, Math.round(img.offsetWidth * dpr)), h = Math.max(1, Math.round(img.offsetHeight * dpr));
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -133,6 +141,12 @@ export function LiquidHover() {
       gl.uniform2f(uBox, w, h); gl.uniform2f(uImg, nat[0], nat[1]); gl.uniform2f(uPos, px, py);
       gl.uniform4fv(uPts, ptsArr); gl.uniform1fv(uLife, lifeArr);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (!checked) {
+        // Safety: the canvas must look like the photo. If this device draws it washed out (or black), the
+        // effect switches itself off for the visit and the photo simply stays as it is.
+        checked = true;
+        if (!looksRight(w, h)) { broken = true; detach(); return; }
+      }
       canvas.style.opacity = '1';
       raf = requestAnimationFrame(frame);
     };
@@ -144,6 +158,7 @@ export function LiquidHover() {
       const img = (e.target as Element | null)?.closest?.('a, button, article, figure, .portal, .ring-card, .top-photo, .bg, .gallery, .pg-item')?.querySelector?.('img') as HTMLImageElement | null;
       const hit = img && img.matches(TARGETS) ? img : null;
       overTarget = !!hit;
+      if (broken) return;
       if (hit && hit !== target) { detach(); attach(hit); last = null; }
       if (!target || !hit) { last = null; if (target) kick(); return; }
       const r = target.getBoundingClientRect();
@@ -151,7 +166,7 @@ export function LiquidHover() {
       const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
       if (last) {
         // Velocity in photo units, softened and capped: fast flicks bend more, but never tear the image.
-        const vx = Math.max(-0.1, Math.min(0.1, (x - last.x) * 1.15)), vy = Math.max(-0.1, Math.min(0.1, (y - last.y) * 1.15));
+        const vx = Math.max(-0.06, Math.min(0.06, (x - last.x) * 0.8)), vy = Math.max(-0.06, Math.min(0.06, (y - last.y) * 0.8));
         if (Math.abs(vx) + Math.abs(vy) > 0.0008) { pts.push({ x, y, vx, vy, t: performance.now() / 1000 }); if (pts.length > MAX_PTS) pts.shift(); }
       }
       last = { x, y };
