@@ -1,6 +1,6 @@
 # Travel Guide
 
-**Live site:** https://travelguide-world.netlify.app
+**Live site:** https://travelguide-enw.pages.dev
 
 **Explore beautifully. Plan effortlessly.**
 
@@ -168,8 +168,10 @@ See `CREDITS.md` for media, data and audio credits, and `docs/DATA.md` for the d
 - **Footer**: Terms, Privacy, Security, Status (live service checks), Community, Docs, Contact and **Manage cookies** (shows and clears everything stored in the browser — the site sets no tracking cookies).
 - **Logo**: brushed-brass compass framing a Himalayan dusk, drawn in SVG (`src/components/Logo.tsx`); the favicon is generated from the same component.
 
-## Deployment (Netlify)
+## Deployment (Cloudflare Pages)
 
-- Project `travelguide-world`. The build runs `scripts/netlify-build.sh`, which downloads the 4K photos and audio from this public GitHub repo when a deploy uploads code only, then runs `npm run build`.
-- **Quote requests** are stored by `netlify/functions/quote.mjs` in Netlify Blobs (store `quote-requests`). The endpoint can only create entries. View them in Netlify → Data & Storage → Blobs; decrypt sealed ones offline with `scripts/decrypt-quote.mjs`.
+- Hosted on **Cloudflare Pages** (project `travelguide`). Build locally and upload the static output:
+  `npm run build && npx wrangler pages deploy dist --project-name travelguide`
+- **Headers** (security + caching) live in `public/_headers`.
+- **Quote requests** go to the Pages Function `functions/api/quote.js`, stored in Workers KV (`travel-guide-quotes`, binding `QUOTES`, configured in `wrangler.toml`). View them in the Cloudflare dashboard → Storage & Databases → KV. Sealed ones decrypt offline with `scripts/decrypt-quote.mjs`.
 - **Firebase (optional)**: set the `VITE_FIREBASE_*` variables (see `.env.example`) and deploy `firestore.rules` to store quote requests in Cloud Firestore instead.

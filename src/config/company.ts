@@ -28,7 +28,7 @@ export const PRICING_BASIS = {
 };
 
 export const ENV = {
-  quoteEndpoint: (import.meta.env.VITE_QUOTE_ENDPOINT as string | undefined) || '',
+  quoteEndpoint: (import.meta.env.VITE_QUOTE_ENDPOINT as string | undefined) || (import.meta.env.PROD ? '/api/quote' : ''),
   fxEndpoint: (import.meta.env.VITE_FX_ENDPOINT as string | undefined) || '',
   disableRemoteMedia: (import.meta.env.VITE_DISABLE_REMOTE_MEDIA as string | undefined) === 'true',
 };

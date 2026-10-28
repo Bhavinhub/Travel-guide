@@ -62,7 +62,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin === self.location.origin) {
-    if (url.pathname.startsWith('/.netlify/')) return;
+    if (url.pathname.startsWith('/api/')) return;
     if (req.mode === 'navigate') {
       e.respondWith(networkFirst(req, SHELL).catch(() => caches.match('./index.html')));
       return;

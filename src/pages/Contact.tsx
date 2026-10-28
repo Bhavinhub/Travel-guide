@@ -64,16 +64,13 @@ export default function Contact() {
       }
     } else if (ENV.quoteEndpoint) {
       setStatus('sending');
-      // Two deliveries: the private store (/api/quote) and Netlify Forms, which shows it in the Forms inbox and
-      // emails it to the site owner. Sent counts as success if either arrives.
-      const plan = payload.plan ? `${payload.plan.name} · ${Math.round(payload.plan.estimateTotalINR).toLocaleString('en-IN')} INR total` : '';
-      const form = new URLSearchParams({ 'form-name': 'quote', name: payload.name, email: payload.email, phone: payload.phone, message: payload.message, plan, country: useStore.getState().prefs.country ?? '' });
-      const [api, forms] = await Promise.allSettled([
-        fetch(ENV.quoteEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', referrerPolicy: 'no-referrer' }),
-        fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString(), credentials: 'omit' }),
-      ]);
-      const ok = (r: PromiseSettledResult<Response>) => r.status === 'fulfilled' && r.value.ok;
-      setStatus(ok(api) || ok(forms) ? 'sent' : 'error');
+      // Stored privately by the site's own function (Cloudflare Pages Function → Workers KV).
+      try {
+        const r = await fetch(ENV.quoteEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', referrerPolicy: 'no-referrer' });
+        setStatus(r.ok ? 'sent' : 'error');
+      } catch {
+        setStatus('error');
+      }
     } else {
       const list = storage.get<unknown[]>('tg.quoteRequests', []);
       storage.set('tg.quoteRequests', [...list, body].slice(-20));

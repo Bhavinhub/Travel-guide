@@ -1,17 +1,17 @@
 /**
- * Live flight offers for Travel Guide (Netlify Function, Node 18+).
- * Keys stay on the server. Configure ONE provider in the Netlify environment:
+ * Live flight offers for Travel Guide (Cloudflare Pages Function).
+ * Keys stay on the server. Configure ONE provider in Cloudflare (Pages project → Settings → Variables and Secrets):
  *   FLIGHTS_PROVIDER=amadeus  + AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET (+ AMADEUS_ENV=production for live data; default test)
  *   FLIGHTS_PROVIDER=duffel   + DUFFEL_ACCESS_TOKEN
  * Without configuration the endpoint answers 501 and the site falls back to its estimates + search links.
  */
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=600' } });
 
-async function amadeus(q) {
-  const host = process.env.AMADEUS_ENV === 'production' ? 'https://api.amadeus.com' : 'https://test.api.amadeus.com';
+async function amadeus(q, env) {
+  const host = env.AMADEUS_ENV === 'production' ? 'https://api.amadeus.com' : 'https://test.api.amadeus.com';
   const tok = await fetch(`${host}/v1/security/oauth2/token`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: process.env.AMADEUS_CLIENT_ID, client_secret: process.env.AMADEUS_CLIENT_SECRET }),
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env.AMADEUS_CLIENT_ID, client_secret: env.AMADEUS_CLIENT_SECRET }),
   }).then((r) => r.json());
   if (!tok.access_token) throw new Error('Amadeus authentication failed');
   const p = new URLSearchParams({ originLocationCode: q.from, destinationLocationCode: q.to, departureDate: q.date, adults: q.adults, currencyCode: 'INR', max: '30', travelClass: q.cabin.toUpperCase() });
@@ -28,13 +28,13 @@ async function amadeus(q) {
   });
 }
 
-async function duffel(q) {
+async function duffel(q, env) {
   const slices = [{ origin: q.from, destination: q.to, departure_date: q.date }];
   if (q.ret) slices.push({ origin: q.to, destination: q.from, departure_date: q.ret });
   const passengers = [...Array(+q.adults).fill({ type: 'adult' }), ...Array(+q.children).fill({ age: 8 })];
   const r = await fetch('https://api.duffel.com/air/offer_requests?return_offers=true', {
     method: 'POST',
-    headers: { authorization: `Bearer ${process.env.DUFFEL_ACCESS_TOKEN}`, 'duffel-version': 'v2', 'content-type': 'application/json', accept: 'application/json' },
+    headers: { authorization: `Bearer ${env.DUFFEL_ACCESS_TOKEN}`, 'duffel-version': 'v2', 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ data: { slices, passengers, cabin_class: q.cabin } }),
   });
   const j = await r.json();
@@ -56,9 +56,9 @@ function limited(ip) {
   return arr.length > 20;
 }
 
-export default async (req, context) => {
+export async function onRequest({ request: req, env }) {
   if (req.method !== 'GET') return json(405, { message: 'Method not allowed' });
-  const ip = context?.ip ?? req.headers.get('x-nf-client-connection-ip') ?? 'unknown';
+  const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
   if (limited(ip)) return json(429, { message: 'Too many searches — please wait a minute.' });
   const u = new URL(req.url);
   const allowed = ['from', 'to', 'date', 'ret', 'adults', 'children', 'cabin'];
@@ -68,11 +68,11 @@ export default async (req, context) => {
   if (new Date(q.date) < new Date(new Date().toISOString().slice(0, 10))) return json(400, { message: 'Date is in the past' });
   q.adults = String(Math.min(9, Math.max(1, parseInt(q.adults, 10) || 1)));
   q.children = String(Math.min(8, Math.max(0, parseInt(q.children, 10) || 0))); q.cabin = ['economy', 'premium_economy', 'business', 'first'].includes(q.cabin) ? q.cabin : 'economy';
-  const provider = process.env.FLIGHTS_PROVIDER;
+  const provider = env.FLIGHTS_PROVIDER;
   try {
     let offers;
-    if (provider === 'amadeus' && process.env.AMADEUS_CLIENT_ID) offers = await amadeus(q);
-    else if (provider === 'duffel' && process.env.DUFFEL_ACCESS_TOKEN) offers = await duffel(q);
+    if (provider === 'amadeus' && env.AMADEUS_CLIENT_ID) offers = await amadeus(q, env);
+    else if (provider === 'duffel' && env.DUFFEL_ACCESS_TOKEN) offers = await duffel(q, env);
     else return json(501, { message: 'Live flight search is not configured on this deployment.' });
     offers.sort((a, b) => a.price - b.price);
     return json(200, { provider, offers: offers.slice(0, 30) });
@@ -80,6 +80,4 @@ export default async (req, context) => {
     console.error('flight search failed', e);
     return json(502, { message: 'Live flight search failed. Please try again later.' });
   }
-};
-
-export const config = { path: '/api/flights' };
+}
