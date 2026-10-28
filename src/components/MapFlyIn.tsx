@@ -7,6 +7,7 @@ import { geocode, nearbySpots, placeHref, SACRED_OR_SCENIC, SCENIC_STOP, type Ne
 import { href, navigate } from '../lib/router';
 import { prefetchArrival, prefetchCorridor, saveTripOffline } from '../lib/offlineMap';
 import { nearestAirport, type Airport } from '../data/airports';
+import { CosmicZoom, type EarthSnapshot } from './CosmicZoom';
 import { useMotion } from '../lib/store';
 
 /**
@@ -375,6 +376,14 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   // Turning the Earth by hand: while the globe is in view it can be dragged (mouse, or two fingers on touch,
   // so one finger still scrolls the page). The visitor's turn is kept and eases away as the camera flies in.
   const globeDrag = useRef(false);
+  // Zooming out past the Earth into space (see CosmicZoom): the target depth, and whether the globe stage is on.
+  const [space, setSpace] = useState(0);
+  const spaceRef = useRef(0); spaceRef.current = space;
+  const [isGlobe, setIsGlobe] = useState(true);
+  const isGlobeRef = useRef(true);
+  const snapRef = useRef<EarthSnapshot | null>(null);
+  const [inSpace, setInSpace] = useState(false);
+  const inSpaceRef = useRef(false);
   const userTurn = useRef({ x: 0, y: 0, b: 0, t: 0 });
   const lastCam = useRef({ c: [0, 0] as [number, number], b: 0, t: 0 });
   freeRef.current = free;
@@ -793,6 +802,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     if (terrainOn.current && (p < 0.9 || (!restingRef.current && p < 0.97))) { terrainOn.current = false; m.setTerrain(null); }
     el.current?.classList.toggle('is-close', zoom > 8.5);
     el.current?.classList.toggle('is-globe', zoom < 3.2);
+    if ((zoom < 3.2) !== isGlobeRef.current) { isGlobeRef.current = zoom < 3.2; setIsGlobe(zoom < 3.2); }
   };
   const camRef = useRef(applyCamera);
   camRef.current = applyCamera;
@@ -962,7 +972,74 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pLat, pLon]);
 
+  const stageRef = useRef<HTMLDivElement>(null);
+  /** Where the globe is on screen, plus a picture of it, so the space view starts exactly where the map was. */
+  const earthOnScreen = () => {
+    const m = map.current, st = stageRef.current;
+    if (!m || !st) return null;
+    const c = m.getCanvas(), cr = c.getBoundingClientRect(), sr = st.getBoundingClientRect();
+    const pt = m.project(m.getCenter()), r = (512 * Math.pow(2, m.getZoom())) / (2 * Math.PI);
+    const k = c.width / (cr.width || 1);
+    return { x: pt.x + cr.left - sr.left, y: pt.y + cr.top - sr.top, r, snap: snapRef.current ? { ...snapRef.current, sx: pt.x * k, sy: pt.y * k, sr: r * k } : null };
+  };
+  /** As the camera leaves for space the map fades out (and the photo of the Milky Way gives way to real space). */
+  const onSpaceDepth = (d: number) => {
+    const mapEl = el.current, st = stageRef.current;
+    if (mapEl) { mapEl.style.opacity = d > 0 ? String(Math.max(0, Math.min(1, 1 - (d - 0.04) / 0.3))) : ''; mapEl.style.visibility = d > 0.4 ? 'hidden' : ''; }
+    st?.style.setProperty('--sky-o', String(Math.max(0, Math.min(1, 1 - (d - 3) / 3))));
+    if ((d > 0.02) !== inSpaceRef.current) { inSpaceRef.current = d > 0.02; setInSpace(d > 0.02); }
+  };
+  // Leaving for space: take one picture of the globe as it is right now (read while the frame is still drawn).
+  useEffect(() => {
+    const m = map.current;
+    if (!m || space <= 0 || snapRef.current) { if (space <= 0) snapRef.current = null; return; }
+    m.once('render', () => {
+      try {
+        const c = m.getCanvas(), off = document.createElement('canvas');
+        off.width = c.width; off.height = c.height; off.getContext('2d')!.drawImage(c, 0, 0);
+        snapRef.current = { img: off, sx: 0, sy: 0, sr: 0 };
+      } catch { /* no picture: the planet is drawn instead */ }
+    });
+    m.triggerRepaint();
+  }, [space > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Mouse wheel and pinch: past the widest view of the Earth they keep going out into space, and back.
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st) return;
+    const wheel = (e: WheelEvent) => {
+      const m = map.current;
+      if (!m) return;
+      const widest = freeRef.current ? m.getZoom() <= Math.max(m.getMinZoom(), 0) + 0.06 : false;
+      if (spaceRef.current > 0 || (widest && e.deltaY > 0) || (e.ctrlKey && isGlobeRef.current && e.deltaY > 0 && !freeRef.current)) {
+        e.preventDefault(); e.stopPropagation();
+        setSpace((t) => Math.max(0, Math.min(40, t + Math.sign(e.deltaY) * Math.min(0.6, Math.abs(e.deltaY) * 0.003))));
+      }
+    };
+    let pinch = 0;
+    const dist = (e: TouchEvent) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const tstart = (e: TouchEvent) => { pinch = e.touches.length === 2 ? dist(e) : 0; };
+    const tmove = (e: TouchEvent) => {
+      const m = map.current;
+      if (!m || e.touches.length !== 2 || !pinch) return;
+      const now = dist(e), ratio = now / pinch;
+      const widest = freeRef.current ? m.getZoom() <= Math.max(m.getMinZoom(), 0) + 0.06 : isGlobeRef.current;
+      if (spaceRef.current > 0 || (widest && ratio < 1)) {
+        e.preventDefault(); e.stopPropagation();
+        setSpace((t) => Math.max(0, Math.min(40, t - Math.log10(ratio) * 4)));
+        pinch = now;
+      }
+    };
+    st.addEventListener('wheel', wheel, { passive: false, capture: true });
+    st.addEventListener('touchstart', tstart, { passive: true, capture: true });
+    st.addEventListener('touchmove', tmove, { passive: false, capture: true });
+    return () => { st.removeEventListener('wheel', wheel, { capture: true }); st.removeEventListener('touchstart', tstart, { capture: true }); st.removeEventListener('touchmove', tmove, { capture: true }); };
+  }, []);
+  useEffect(() => setSpace(0), [lat, lon]);
+  /** At the widest view of the Earth, zooming out carries on into space (and zooming in comes back). */
+  const atWidest = () => { const m = map.current; return !!m && (free ? m.getZoom() <= Math.max(m.getMinZoom(), 0) + 0.06 : isGlobeRef.current); };
+  const goSpace = (delta: number) => setSpace((t) => Math.max(0, Math.min(40, t + delta)));
   const zoomBy = (d: number) => {
+    if (spaceRef.current > 0 || (d < 0 && atWidest())) { goSpace(-d * 0.8); return; }
     // Zooming at the destination hands the camera to the visitor (explore mode), so scrolling won't undo it.
     if (!free && !reduced) { setFree(true); setInteractive(true); settle(true); }
     map.current?.easeTo({ zoom: Math.min(19, map.current.getZoom() + d), duration: 400 });
@@ -979,9 +1056,12 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
 
   return (
     <>
-    <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}`} aria-label={`3D map journey to ${name}`}>
+    <section ref={sec} className={`mapfly${from ? ' has-route' : ''}${reduced ? ' is-static' : ''}${free ? ' is-free' : ''}${inSpace ? ' is-space' : ''}`} aria-label={`3D map journey to ${name}`}>
       <div ref={stickyRef} className={`mapfly-sticky${full ? ' is-full' : ''}`}>
-        <div className="mapfly-stage"><SpaceSky /><div ref={el} className={`mapfly-map${loaded ? ' is-ready' : ''}`} /></div>
+        <div ref={stageRef} className="mapfly-stage"><SpaceSky /><div ref={el} className={`mapfly-map${loaded ? ' is-ready' : ''}`} />
+          <CosmicZoom target={space} earth={earthOnScreen} onDepth={onSpaceDepth} />
+        </div>
+        {space > 0 && <button type="button" className="btn btn-sm cosmic-home" onClick={() => setSpace(0)}>🌍 Back to Earth</button>}
         {!loaded && (
           <div className="mapfly-loading" aria-live="polite">
             <span className="mf-earth" aria-hidden />
@@ -1038,7 +1118,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         {locMsg && <p className="mapfly-offline small" role="status" onClick={() => setLocMsg('')}>{locMsg}</p>}
         {!online && <p className="mapfly-offline small" role="status">Offline — showing the map saved on this device</p>}
         {savedMsg && <p className="mapfly-offline small is-ok" role="status" onClick={() => setSavedMsg('')}>{savedMsg}</p>}
-        {(free || reduced || arrived) && (
+        {(free || reduced || arrived || isGlobe || space > 0) && (
           <div className="mapfly-zoom glass" role="group" aria-label="Zoom">
             <button onClick={() => zoomBy(1)} aria-label="Zoom in">+</button>
             <button onClick={() => zoomBy(-1)} aria-label="Zoom out">−</button>
