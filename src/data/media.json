@@ -3865,5 +3865,95 @@
     }
    }
   ]
+ },
+ "space-deep-field": {
+  "article": "Hubble Ultra-Deep Field",
+  "caption": "Hubble Ultra Deep Field — about 10,000 galaxies",
+  "images": [
+   {
+    "file": "File:Hubble ultra deep field.jpg",
+    "width": 3100,
+    "height": 3100,
+    "author": "NASA and ESA",
+    "license": "Public domain",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Hubble_ultra_deep_field.jpg",
+    "sizes": {
+     "1920": "/media/space/deep-field.jpg"
+    }
+   }
+  ]
+ },
+ "space-milky-way-above": {
+  "article": "Milky Way",
+  "caption": "The Milky Way seen from above (illustration based on survey data)",
+  "images": [
+   {
+    "file": "File:Milky Way Galaxy.jpg",
+    "width": 2795,
+    "height": 2795,
+    "author": "Nick Risinger",
+    "license": "Public domain",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Milky_Way_Galaxy.jpg",
+    "sizes": {
+     "1920": "/media/space/milky-way-above.jpg"
+    }
+   }
+  ]
+ },
+ "space-andromeda": {
+  "article": "Andromeda Galaxy",
+  "caption": "The Andromeda Galaxy (M31)",
+  "images": [
+   {
+    "file": "File:Andromeda Galaxy (with h-alpha).jpg",
+    "width": 3000,
+    "height": 1971,
+    "author": "Adam Evans",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Andromeda_Galaxy_(with_h-alpha).jpg",
+    "sizes": {
+     "1920": "/media/space/andromeda.jpg"
+    }
+   }
+  ]
+ },
+ "space-triangulum": {
+  "article": "Triangulum Galaxy",
+  "caption": "The Triangulum Galaxy (M33)",
+  "images": [
+   {
+    "file": "File:Triangulum Galaxy.jpg",
+    "width": 3293,
+    "height": 3585,
+    "author": "Michael Sadler",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Triangulum_Galaxy.jpg",
+    "sizes": {
+     "1920": "/media/space/triangulum.jpg"
+    }
+   }
+  ]
+ },
+ "space-cosmic-web": {
+  "article": "Observable universe",
+  "caption": "The cosmic web — large-scale structure (simulation render)",
+  "images": [
+   {
+    "file": "File:Large-scale structure of light distribution in the universe.jpg",
+    "width": 4822,
+    "height": 3511,
+    "author": "Andrew Pontzen and Fabio Governato",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Large-scale_structure_of_light_distribution_in_the_universe.jpg",
+    "sizes": {
+     "1920": "/media/space/cosmic-web.jpg"
+    }
+   }
+  ]
  }
 }

@@ -106,6 +106,29 @@ function deepfield(W: number, H: number, dpr: number) {
   return c;
 }
 
+/** Real pictures (credits in media.json): Hubble's deep field, our galaxy from above, Andromeda, Triangulum, the cosmic web. */
+const PHOTOS = { deep: 'deep-field.jpg', mw: 'milky-way-above.jpg', m31: 'andromeda.jpg', m33: 'triangulum.jpg', web: 'cosmic-web.jpg' } as const;
+const photoCache: Partial<Record<keyof typeof PHOTOS, HTMLImageElement>> = {};
+/** The picture once it has loaded (null until then; `ready` is called when it arrives). Loaded only when first needed. */
+function photo(k: keyof typeof PHOTOS, ready: () => void) {
+  let im = photoCache[k];
+  if (!im) { im = photoCache[k] = new Image(); im.decoding = 'async'; im.onload = ready; im.src = `${import.meta.env.BASE_URL}media/space/${PHOTOS[k]}`; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+
+/** The cosmic web picture as a soft-edged disc (a square crop fading out at its rim), made once. */
+let softWeb: HTMLCanvasElement | null = null;
+function webDisc(im: HTMLImageElement) {
+  if (softWeb) return softWeb;
+  const side = Math.min(im.naturalWidth, im.naturalHeight), c = document.createElement('canvas'); c.width = c.height = side;
+  const x = c.getContext('2d')!;
+  x.drawImage(im, (im.naturalWidth - side) / 2, (im.naturalHeight - side) / 2, side, side, 0, 0, side, side);
+  const g = x.createRadialGradient(side / 2, side / 2, side * 0.28, side / 2, side / 2, side / 2);
+  g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.globalCompositeOperation = 'destination-in'; x.fillStyle = g; x.fillRect(0, 0, side, side);
+  return (softWeb = c);
+}
+
 export interface EarthOnScreen { x: number; y: number; r: number }
 /** The map's globe as a picture: the snapshot and where the globe sits in it (snapshot pixels). */
 export interface EarthSnapshot { img: CanvasImageSource; sx: number; sy: number; sr: number }
@@ -196,7 +219,18 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
       x.fillStyle = g; x.beginPath(); x.arc(sx, sy, r, 0, Math.PI * 2); x.fill();
     };
 
-    // Deep background: a black sky that thickens as the photo of the Milky Way fades away.
+    const redraw = () => { if (!raf.current) raf.current = requestAnimationFrame(frame); };
+    /** A picture centred on a screen point, `w` pixels wide, blended like light (its black sky disappears). */
+    const pic = (k: keyof typeof PHOTOS, cx: number, cy: number, w: number, a: number, rot = 0) => {
+      if (a <= 0.01) return true;
+      const im = photo(k, redraw);
+      if (!im) return false;
+      const h = (w * im.naturalHeight) / im.naturalWidth;
+      if (cx + w < 0 || cy + w < 0 || cx - w > W || cy - w > H) return true;
+      x.save(); x.globalCompositeOperation = 'screen'; x.globalAlpha = a; x.translate(cx, cy); x.rotate(rot);
+      x.drawImage(im, -w / 2, -h / 2, w, h); x.restore();
+      return true;
+    };
     // Real night sky: the photo of the Milky Way stays behind (see --sky-o), dimmed a little, with the stars on top;
     // once the camera is outside our galaxy, a field of distant galaxies takes over.
     x.fillStyle = `rgba(2,3,8,${clamp((v - 6) / 3) * 0.45 + clamp((v - 17.2) / 1) * 0.4})`; x.fillRect(0, 0, W, H);
@@ -205,8 +239,14 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     const drift = 1 + (v % 1) * 0.12; // a slow parallax drift as the view grows
     x.save(); x.translate(W / 2, H / 2); x.scale(drift, drift); x.translate(-W / 2, -H / 2);
     x.globalAlpha = clamp((v - 5.6) / 2) * (1 - clamp((v - 17.6) / 1.2) * 0.75); x.drawImage(sky.current.stars!, 0, 0, W, H);
-    x.globalAlpha = clamp((v - 17.2) / 1.2); x.drawImage(sky.current.deep!, 0, 0, W, H);
     x.restore(); x.globalAlpha = 1;
+    // Outside our galaxy: the Hubble Ultra Deep Field — thousands of real galaxies — fills the sky.
+    const da = clamp((v - 17.2) / 1.2);
+    if (da > 0) {
+      const im = v > 15.5 ? photo('deep', redraw) : null, side = Math.max(W, H) * drift * 1.05;
+      if (im) { x.globalAlpha = da * 0.85; x.drawImage(im, (W - side) / 2, (H - side) / 2, side, side); x.globalAlpha = 1; }
+      else { x.globalAlpha = da; x.drawImage(sky.current.deep!, 0, 0, W, H); x.globalAlpha = 1; }
+    }
 
     const sunS = P(SUN);
     // ── Solar system ──
@@ -277,11 +317,11 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
       }
       x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
     };
-    const mw = clamp((v - 16.4) / 1);
+    const mw = clamp((v - 16.4) / 1) * clamp(1 - (v - 20.6) / 0.6); // our galaxy, until it shrinks to a speck
     if (mw > 0) {
       const gc = P(GC), gr = 5e17 * S;
-      glow(gc[0], gc[1], Math.max(gr * 0.35, 8), 'rgba(255,214,150,.55)', mw);
-      gal(MILKY, GC, mw, '#ffe0b0', '#a9c6ff');
+      glow(gc[0], gc[1], Math.max(gr * 0.25, 8), 'rgba(255,214,150,.4)', mw);
+      if (!(v > 15.5 && pic('mw', gc[0], gc[1], (1e18 / 0.84) * S, mw, -0.35))) gal(MILKY, GC, mw, '#ffe0b0', '#a9c6ff');
       // Sagittarius A*: the black hole at the centre — a dark shadow inside a glowing ring.
       const br = clamp(Math.max(gr * 0.012, 5), 5, 14);
       x.globalAlpha = mw; x.strokeStyle = '#ffb44d'; x.lineWidth = br * 0.45; x.shadowColor = '#ff9a2a'; x.shadowBlur = 12;
@@ -295,12 +335,14 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
     }
     const lg = clamp((v - 18.6) / 0.9) * clamp(1 - (v - 22.8) / 1);
     if (lg > 0) {
-      gal(ANDRO, ANDROMEDA, lg, '#ffe6c4', '#bcd2ff'); gal(TRI, TRIANGULUM, lg, '#fff0d8', '#b8d0ff');
       const a = P(ANDROMEDA), t = P(TRIANGULUM), l = P(LMC), sm = P(SMC);
+      const m31 = pic('m31', a[0], a[1], Math.max((2.2e18 / 0.6) * S, 34), lg, 0.5), m33 = pic('m33', t[0], t[1], Math.max((6e17 / 0.8) * S, 16), lg);
+      if (!m31) gal(ANDRO, ANDROMEDA, lg, '#ffe6c4', '#bcd2ff');
+      if (!m33) gal(TRI, TRIANGULUM, lg, '#fff0d8', '#b8d0ff');
       hit('Andromeda', a[0], a[1], Math.max(1.05e18 * S * 0.7, 9), lg); hit('Triangulum', t[0], t[1], Math.max(3e17 * S, 7), lg);
       hit('Large Magellanic Cloud', l[0], l[1], Math.max(1.4e17 * S, 6), lg * clamp(1 - (v - 19.6) / 0.4)); hit('Small Magellanic Cloud', sm[0], sm[1], Math.max(1e17 * S, 6), lg * clamp(1 - (v - 19.6) / 0.4));
       if (v > 20.2) hit('Local Group', P(LG)[0], P(LG)[1], Math.max(5e19 * S * 0.5, 22), lg);
-      glow(a[0], a[1], Math.max(1.05e18 * S * 0.3, 6), 'rgba(255,225,180,.6)', lg);
+      if (!m31) glow(a[0], a[1], Math.max(1.05e18 * S * 0.3, 6), 'rgba(255,225,180,.6)', lg);
       [l, sm].forEach((q) => glow(q[0], q[1], Math.max(1.4e17 * S, 3), 'rgba(200,215,255,.7)', lg));
       label('Andromeda', a[0], a[1], lg * clamp(1 - (v - 21.2) / 0.5), 12.5); label('Triangulum', t[0], t[1], lg * clamp((v - 19.5) / 0.5) * clamp(1 - (v - 21) / 0.5), 11);
       label('Magellanic Clouds', l[0], l[1], lg * clamp((v - 18.6) / 0.5) * clamp(1 - (v - 19.6) / 0.4), 10.5);
@@ -317,8 +359,17 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
         x.fillStyle = '#ffe2b8'; wb.nodes.forEach((q) => { x.globalAlpha = alpha; x.beginPath(); x.arc(o[0] + q[0] * scale, o[1] + q[1] * scale, 1.8, 0, Math.PI * 2); x.fill(); });
         x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
       };
-      drawWeb(WEB, S, wa * clamp(1 - (v - 25.6) / 1.2));
       const er = EDGE * S;
+      // The cosmic web (a render of the real large-scale structure) filling the observable universe — shown
+      // once the whole universe fits the screen, so the picture is never stretched into a blur.
+      const webA = wa * clamp((Math.max(W, H) * 3 - er) / (Math.max(W, H) * 1.2)) * clamp(1 - (v - 25.6) / 1.2);
+      const webIm = webA > 0.01 ? photo('web', redraw) : null;
+      const disc = (cx: number, cy: number, rad: number, a: number) => {
+        const im = photo('web', redraw);
+        if (!im || a <= 0.01 || cx + rad < 0 || cy + rad < 0 || cx - rad > W || cy - rad > H) return;
+        x.save(); x.globalCompositeOperation = 'screen'; x.globalAlpha = a; x.drawImage(webDisc(im), cx - rad, cy - rad, rad * 2, rad * 2); x.restore();
+      };
+      if (webIm) disc(o[0], o[1], er * 1.02, webA); else drawWeb(WEB, S, webA);
       hit('Cosmic web', o[0], o[1], Math.max(W, H), wa); if (v > 23.2) hit('Observable universe', o[0], o[1], er * 1.08, clamp((v - 23.2) / 0.6));
       if (v > 23.2) {
         const ea = clamp((v - 23.2) / 0.6);
@@ -332,7 +383,8 @@ export function CosmicZoom({ target, earth, onDepth }: { target: number; earth: 
         const lv = v - 24.6, base = Math.floor(lv), fr = lv - base;
         for (let i = 0; i < 2; i++) {
           const sc = EDGE * 3 * Math.pow(10, base + i) * S, a = clamp((v - 24.6) / 0.8) * (i === 0 ? 1 - fr : fr) * 0.8;
-          drawWeb(BEYOND, sc, a);
+          const im = photo('web', redraw);
+          if (im) { webDisc(im); for (let k = 0; k < 7; k++) { const ang = k * 0.9 + base * 1.7, dist = k ? sc * 1.9 : 0; disc(o[0] + Math.cos(ang) * dist, o[1] + Math.sin(ang) * dist, sc, a * (k ? 0.75 : 0.9)); } } else drawWeb(BEYOND, sc, a);
         }
       }
     }
