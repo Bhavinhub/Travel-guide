@@ -1597,3 +1597,108 @@ html body .map-mover.is-parked { opacity: 0 !important; pointer-events: none; } 
 .mapfly-map.is-globe .map-dest { opacity: .8; }
 /* Phones: a long multi-leg summary stays compact so the map is not hidden behind it. */
 @media (max-width: 600px) { html body .mapfly .mapfly-route { font-size: .72rem; line-height: 1.3; padding: .3rem .75rem; } }
+/* Zoom +/− sit on the right edge, mid-height: clear of the From/To panel, route summary and options button. */
+html body .mapfly .mapfly-zoom { top: 50%; bottom: auto; right: .75rem; transform: translateY(-50%); z-index: 8; }
+
+/* Route form: "+ Stop" between From and To; with a stop the fields share the row (wrapping on phones). */
+.mapfly-route-form .mf-add-stop { align-self: flex-end; min-height: 36px; white-space: nowrap; display: inline-flex; align-items: center; gap: .25rem; font-weight: 700; }
+.mf-stop { position: relative; display: flex; align-items: flex-end; gap: .3rem; flex: 1 1 0; min-width: 0; }
+.mf-stop .mf-field { flex: 1 1 0; min-width: 0; }
+.mf-stop .mf-stop-x { min-height: 36px; padding: 0 .6rem; font-size: 1.1rem; line-height: 1; }
+.mf-list .mf-here b { color: #f4b860; }
+html body .mapfly .mapfly-route-form.has-stop { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .mapfly-route-form .mf-add-stop { min-width: 40px; justify-content: center; padding: 0 .55rem; }
+  .mapfly-route-form .mf-add-stop span { display: none; }
+  html body .mapfly .mapfly-route-form.has-stop .mf-field, html body .mapfly .mapfly-route-form.has-stop .mf-stop { flex: 1 1 42%; }
+  html body .mapfly .mapfly-route-form.has-stop > .mf-field:last-of-type { flex-basis: 60%; }
+}
+/* Map notes (location, offline, saved): one small line just above "Map options", under the From/To lists. */
+html body .mapfly .mapfly-offline { top: auto; bottom: 4.2rem; z-index: 5; white-space: normal; text-align: center; font-size: .78rem; line-height: 1.35; padding: .35rem .8rem; border-radius: 12px; max-width: min(460px, calc(100% - 1.5rem)); width: max-content; cursor: pointer; }
+/* Compact map controls: the map itself gets the space. */
+/* Map options: a small round ☰ (■ while a journey plays); its name is in the tooltip and for screen readers. */
+html body .mapfly .mf-options-btn { min-height: 0; width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 1.05rem; line-height: 1; display: grid; place-items: center; }
+html body .mapfly .mapfly-zoom button { width: 32px; height: 32px; font-size: 1.1rem; }
+html body .mapfly .mapfly-zoom { border-radius: 11px; }
+html body .mapfly .mapfly-route-form { padding: .3rem .4rem; gap: .35rem; border-radius: 13px; }
+html body .mapfly .mapfly-route-form .mf-field { gap: .05rem; }
+html body .mapfly .mapfly-route-form .mf-field > .tiny { font-size: .66rem; line-height: 1.1; }
+html body .mapfly .mapfly-route-form .mf-field .input { min-height: 30px; padding: .25rem .55rem; font-size: .8rem; border-radius: 10px; }
+html body .mapfly .mapfly-route-form > .btn, html body .mapfly .mapfly-route-form .mf-add-stop, html body .mapfly .mf-stop .mf-stop-x { min-height: 30px; min-width: 30px; padding: 0 .45rem; font-size: .8rem; }
+/* The imagery credit ⓘ: MapLibre's own button, just drawn a little smaller (resizing its parts misaligns the icon). */
+html body .mapfly .maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib.maplibregl-compact { transform: scale(.8); transform-origin: 100% 100%; }
+/* Route summary as liquid glass: frosted, see-through, a bright rim and a soft gold glint. */
+html body .mapfly .mapfly-route {
+  background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.06) 55%, rgba(244,184,96,.16));
+  -webkit-backdrop-filter: blur(16px) saturate(1.7); backdrop-filter: blur(16px) saturate(1.7);
+  border: 1px solid rgba(255,255,255,.32); color: #fff7e6; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,.55);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.18), 0 8px 24px rgba(0,0,0,.35);
+}
+@media (max-width: 640px) { html body .mapfly .mapfly-route { top: 4.6rem; } }
+
+/* ── "Travel Guide" wordmark: 3D watery-glass letters ─────────────────────────────────────────────
+   Liquid colour flows through the letters and slowly cycles through the spectrum (never the same
+   twice in a row); a glassy highlight sits on the top half of each letter; layered shadows give depth. */
+html body .wordmark .wm-a, html body .wordmark .wm-b, html[data-theme='light'] body .wordmark .wm-a, html[data-theme='light'] body .wordmark .wm-b {
+  position: relative; display: inline-block;
+  background-image: linear-gradient(100deg, #7ff3ff 0%, #74a8ff 18%, #b48bff 34%, #ff9fd2 50%, #ffd27a 66%, #8ff7c8 82%, #7ff3ff 100%);
+  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  animation: wmFlow 10s linear infinite, wmHue 24s linear infinite;
+}
+html body .wordmark .wm-b, html[data-theme='light'] body .wordmark .wm-b { animation-delay: -5s, -6s; }
+html body .wordmark .wm-a::after, html body .wordmark .wm-b::after {
+  content: attr(data-text); position: absolute; left: 0; top: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 38%, rgba(255,255,255,0) 52%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; filter: none; animation: none;
+}
+@keyframes wmFlow { to { background-position: -300% 0; } }
+@keyframes wmHue {
+  from { filter: hue-rotate(0deg) drop-shadow(0 1px 0 rgba(255,255,255,.4)) drop-shadow(0 2px 0 rgba(20,40,90,.55)) drop-shadow(0 3px 0 rgba(10,20,50,.4)) drop-shadow(0 6px 10px rgba(0,0,0,.5)); }
+  to { filter: hue-rotate(360deg) drop-shadow(0 1px 0 rgba(255,255,255,.4)) drop-shadow(0 2px 0 rgba(20,40,90,.55)) drop-shadow(0 3px 0 rgba(10,20,50,.4)) drop-shadow(0 6px 10px rgba(0,0,0,.5)); }
+}
+html[data-motion='reduced'] body .wordmark .wm-a, html[data-motion='reduced'] body .wordmark .wm-b { animation: none; filter: drop-shadow(0 2px 0 rgba(20,40,90,.55)) drop-shadow(0 6px 10px rgba(0,0,0,.5)); }
+@media (prefers-reduced-motion: reduce) { html body .wordmark .wm-a, html body .wordmark .wm-b { animation: none; } }
+
+/* ── Map: 3D liquid-water glass for the From/To panel ─────────────────────────────────────────── */
+html body .mapfly .mapfly-route-form {
+  background: linear-gradient(160deg, rgba(255,255,255,.20) 0%, rgba(255,255,255,.05) 45%, rgba(120,200,255,.10) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(1.8) brightness(1.05); backdrop-filter: blur(18px) saturate(1.8) brightness(1.05);
+  border: 1px solid rgba(255,255,255,.30);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -8px 16px -10px rgba(0,0,0,.45), inset 0 0 18px rgba(140,210,255,.10), 0 10px 28px rgba(0,0,0,.38);
+  overflow: visible;
+}
+html body .mapfly .mapfly-route-form::before {
+  /* the water's specular glint along the top edge */
+  content: ''; position: absolute; left: 8%; right: 8%; top: 2px; height: 42%; border-radius: 12px 12px 40% 40% / 12px 12px 100% 100%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,0));
+}
+html body .mapfly .mapfly-route-form .mf-field .input, html body .mapfly .mapfly-route-form > .btn, html body .mapfly .mapfly-route-form .mf-add-stop, html body .mapfly .mf-stop .mf-stop-x {
+  background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04)); border: 1px solid rgba(255,255,255,.26); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), inset 0 -3px 8px -4px rgba(0,0,0,.4);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+html body .mapfly .mapfly-route-form .mf-field .input::placeholder { color: rgba(255,255,255,.6); }
+html body .mapfly .mapfly-route-form .mf-field > .tiny { color: rgba(255,255,255,.75); }
+
+/* ── Zoom: no box, just the + and − floating with a soft glow ─────────────────────────────────── */
+html body .mapfly .mapfly-zoom { background: none !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; gap: .2rem; overflow: visible; }
+html body .mapfly .mapfly-zoom button { color: #fff; font-size: 1.6rem; font-weight: 300; text-shadow: 0 0 6px rgba(0,0,0,.9), 0 0 14px rgba(0,0,0,.6); border-radius: 50%; }
+html body .mapfly .mapfly-zoom button:hover, html body .mapfly .mapfly-zoom button:active { background: rgba(255,255,255,.14); }
+/* The field being typed in (and its suggestions) always sits above its neighbours. */
+html body .mapfly .mapfly-route-form :is(.mf-field, .mf-stop):focus-within { position: relative; z-index: 30; }
+html body .mapfly .mapfly-route-form .mf-list { z-index: 31; }
+
+/* Route summary: the same water-glass as the From/To panel. */
+html body .mapfly .mapfly-route {
+  background: linear-gradient(160deg, rgba(255,255,255,.20) 0%, rgba(255,255,255,.05) 45%, rgba(120,200,255,.10) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(1.8) brightness(1.05); backdrop-filter: blur(18px) saturate(1.8) brightness(1.05);
+  border: 1px solid rgba(255,255,255,.30); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -8px 16px -10px rgba(0,0,0,.45), inset 0 0 18px rgba(140,210,255,.10), 0 10px 28px rgba(0,0,0,.38);
+}
+
+/* The credit ⓘ: no disc, just a glowing "i" (tap still opens the credits). */
+html body .mapfly .maplibregl-ctrl-attrib.maplibregl-compact, html body .mapfly .maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) { background: none; box-shadow: none; }
+html body .mapfly .maplibregl-ctrl-attrib-button { background: none !important; box-shadow: none; }
+html body .mapfly .maplibregl-ctrl-attrib-button::after { content: 'i'; position: absolute; inset: 0; display: grid; place-items: center; font: italic 700 15px/1 Georgia, serif; color: #fff; text-shadow: 0 0 5px rgba(0,0,0,.95), 0 0 12px rgba(0,0,0,.6); }
+html body .mapfly .maplibregl-ctrl-attrib.maplibregl-compact-show { background: rgba(10,20,30,.75); color: #dfe8ee; }
+html body .mapfly .maplibregl-ctrl-attrib.maplibregl-compact-show a { color: #dfe8ee; }

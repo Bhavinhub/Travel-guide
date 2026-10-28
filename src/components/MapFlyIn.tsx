@@ -82,6 +82,14 @@ async function currentPlace(): Promise<MapOrigin> {
   return { name, lat, lon };
 }
 
+/** No GPS permission: the visitor's approximate city from their connection (no prompt, city-level only). */
+async function approxPlace(): Promise<MapOrigin> {
+  const j = await fetch('https://get.geojs.io/v1/ip/geo.json').then((x) => x.json());
+  const lat = parseFloat(j.latitude), lon = parseFloat(j.longitude);
+  if (!isFinite(lat) || !isFinite(lon)) throw new Error('no position');
+  return { name: j.city || j.region || 'My area', lat, lon };
+}
+
 /** How the visitor travels: the route, the time and the icon moving on the map follow it. */
 export type Travel = 'auto' | 'car' | 'bike' | 'train' | 'flight' | 'walk';
 const VEHICLE: Record<Exclude<Travel, 'auto'>, { icon: string; label: string }> = {
@@ -267,6 +275,18 @@ async function fetchRoute(from: MapOrigin, to: [number, number], signal: AbortSi
   return canFly ? flyRoute(a, to, A!, B!, signal, 'No route found — shown as a flight', { from: from.name, to: toName }) : arcOnly('No route found — shown as a flight');
 }
 
+/** A journey with a stop on the way: the two journeys joined end to end, each keeping its own legs. */
+async function fetchRouteVia(from: MapOrigin, via: MapOrigin, to: [number, number], signal: AbortSignal, travel: Travel, toName?: string): Promise<Route> {
+  const [r1, r2] = await Promise.all([fetchRoute(from, [via.lat, via.lon], signal, travel, via.name), fetchRoute(via, to, signal, travel, toName)]);
+  const off = r1.pts.length - 1;
+  const titled = (r: Route, a: string, b: string) => legsOf(r).map((l) => ({ ...l, title: l.title ?? `${a} → ${b}` }));
+  const legs = [...titled(r1, from.name, via.name), ...titled(r2, via.name, toName ?? 'destination').map((l) => ({ ...l, from: l.from + off, to: l.to + off }))];
+  const km = r1.km + r2.km, hours = (r1.hours ?? 0) + (r2.hours ?? 0) + (r1.walkHours ?? 0);
+  const note = [r1.note, r2.note].filter(Boolean).join(' · ') || undefined;
+  return { ...buildRoute([...r1.pts, ...r2.pts.slice(1)], r1.mode === 'air' && r2.mode === 'air' ? 'air' : 'road', km, hours), travel: r1.travel, note, legs,
+    walkFrom: r2.walkFrom !== undefined ? r2.walkFrom + off : undefined, walkKm: r2.walkKm, walkHours: r2.walkHours };
+}
+
 export interface RouteStop extends NearbySpot { frac: number; kmFromStart: number }
 
 /** Beautiful places along the way: sample the route and pick the most scenic photographed spot near each sample. */
@@ -289,7 +309,7 @@ async function scenicStops(r: Route, from: MapOrigin, to: [number, number], sign
 }
 
 /** Place picker for the map's From / To boxes: curated destinations first, then any place on Earth. */
-function PlaceInput({ label, value, onPick }: { label: string; value: string; onPick: (p: MapOrigin) => void }) {
+function PlaceInput({ label, value, onPick, onLocate, placeholder = 'Any city or place' }: { label: string; value: string; onPick: (p: MapOrigin) => void; onLocate?: () => void; placeholder?: string }) {
   const [q, setQ] = useState(value);
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<(MapOrigin & { sub?: string })[]>([]);
@@ -310,10 +330,11 @@ function PlaceInput({ label, value, onPick }: { label: string; value: string; on
   return (
     <label className="mf-field" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setOpen(false); setQ(value); } }}>
       <span className="tiny muted">{label}</span>
-      <input className="input" aria-label={label} value={q} placeholder="Any city or place" onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={(e) => { e.currentTarget.select(); setOpen(true); }}
+      <input className="input" aria-label={label} value={q} placeholder={placeholder} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={(e) => { e.currentTarget.select(); setOpen(true); }}
         onKeyDown={(e) => { if (e.key === 'Enter' && items[0]) { e.preventDefault(); pick(items[0]); } if (e.key === 'Escape') setOpen(false); }} />
-      {open && items.length > 0 && (
+      {open && (items.length > 0 || onLocate) && (
         <span className="mf-list" role="listbox" onMouseDown={(e) => e.preventDefault()}>
+          {onLocate && <button type="button" role="option" aria-selected={false} className="mf-here" onClick={() => { setOpen(false); onLocate(); }}><b>📍 Current location</b><span className="tiny muted"> start from where you are</span></button>}
           {items.map((p, i) => <button type="button" key={`${p.name}-${i}`} role="option" aria-selected={false} aria-label={`${p.name}${p.sub ? `, ${p.sub}` : ''}`} onClick={() => pick(p)}><b>{p.name}</b>{p.sub && <span className="tiny muted"> {p.sub}</span>}</button>)}
         </span>
       )}
@@ -323,10 +344,11 @@ function PlaceInput({ label, value, onPick }: { label: string; value: string; on
 
 export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from: pFrom }: { lat: number; lon: number; name: string; spots?: MapSpot[]; zoomTo?: number; from?: MapOrigin }) {
   // Visitors can pick their own From / To; otherwise the page's place and nearest city are used.
-  const [custom, setCustom] = useState<{ from?: MapOrigin; to?: MapOrigin }>({});
-  useEffect(() => setCustom({}), [pLat, pLon]);
+  const [custom, setCustom] = useState<{ from?: MapOrigin; to?: MapOrigin; via?: MapOrigin }>({});
+  const [addingStop, setAddingStop] = useState(false);
+  useEffect(() => { setCustom({}); setAddingStop(false); }, [pLat, pLon]);
   const lat = custom.to?.lat ?? pLat, lon = custom.to?.lon ?? pLon, name = custom.to?.name ?? pName;
-  const from = custom.from ?? pFrom;
+  const from = custom.from ?? pFrom, via = custom.via;
   const autoplay = useRef(false);
   // Only build the 3D Earth when the visitor gets close to it (keeps pages fast), then fade it in once drawn.
   const [near, setNear] = useState(false);
@@ -348,12 +370,19 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   const [travel, setTravel] = useState<Travel>('auto');
   const [free, setFree] = useState(false);
   const freeRef = useRef(false);
+  const [arrived, setArrived] = useState(false); // landed at the place: zoom buttons appear
+  const arrivedRef = useRef(false);
+  // Turning the Earth by hand: while the globe is in view it can be dragged (mouse, or two fingers on touch,
+  // so one finger still scrolls the page). The visitor's turn is kept and eases away as the camera flies in.
+  const globeDrag = useRef(false);
+  const userTurn = useRef({ x: 0, y: 0, b: 0, t: 0 });
+  const lastCam = useRef({ c: [0, 0] as [number, number], b: 0, t: 0 });
   freeRef.current = free;
   const [playing, setPlaying] = useState(false);
   const arriveZoom = Math.min(zoomTo - 1, 14.4); // the landed view: the place with its town around it
   const playRef = useRef(false);
   const { reduced } = useMotion();
-  const fromKey = from ? `${from.name}|${from.lat},${from.lon}` : '';
+  const fromKey = from ? `${from.name}|${from.lat},${from.lon}${via ? `|${via.lat},${via.lon}` : ''}` : '';
   const kick = useRef<() => void>(() => undefined);
   const terrainOn = useRef(false);
   const restingRef = useRef(false);
@@ -442,10 +471,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           { id: 'street-names', type: 'symbol', source: 'names', 'source-layer': 'transportation_name', minzoom: 14,
             layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']] as maplibregl.ExpressionSpecification, 'text-font': ['Noto Sans Regular'], 'text-size': 11 },
             paint: { 'text-color': '#f1efe6', 'text-halo-color': 'rgba(0,0,0,.8)', 'text-halo-width': 1.3 } },
-          { id: 'poi-dots', type: 'circle', source: 'names', 'source-layer': 'poi', minzoom: 13.5, filter: ['has', 'name'],
+          { id: 'poi-dots', type: 'circle', source: 'names', 'source-layer': 'poi', minzoom: 13, filter: ['has', 'name'],
             paint: { 'circle-radius': 3.2, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#fff',
               'circle-color': ['match', ['get', 'class'], ['cafe', 'restaurant', 'fast_food', 'bar', 'beer', 'ice_cream'], '#f59e42', ['lodging'], '#5aa7ff', ['place_of_worship', 'attraction', 'museum', 'monument', 'castle'], '#f4c84a', ['park', 'garden'], '#5fd18b', '#e7e7e7'] } },
-          { id: 'poi-names', type: 'symbol', source: 'names', 'source-layer': 'poi', minzoom: 13.5, filter: ['has', 'name'],
+          { id: 'poi-names', type: 'symbol', source: 'names', 'source-layer': 'poi', minzoom: 13, filter: ['has', 'name'],
             layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name']] as maplibregl.ExpressionSpecification, 'text-font': ['Noto Sans Regular'], 'text-size': 11.5,
               'text-anchor': 'top', 'text-offset': [0, 0.55], 'text-max-width': 8, 'symbol-sort-key': ['get', 'rank'] },
             paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,.85)', 'text-halo-width': 1.4 } },
@@ -466,7 +495,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     pin.innerHTML = `<span class="pulse"></span><span class="dot"></span><b>${esc(name)}</b>`;
     pin.title = `Play the journey to ${name}`;
     pin.addEventListener('click', () => playFn.current());
-    new maplibregl.Marker({ element: pin }).setLngLat([lon, lat]).addTo(m);
+    new maplibregl.Marker({ opacityWhenCovered: '0', element: pin }).setLngLat([lon, lat]).addTo(m);
     // All Travel Guide destinations as round photo markers — click one to open its guide.
     DESTINATIONS.forEach((d) => {
       const im = localImages(d.id)[0];
@@ -476,7 +505,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       e.title = `${d.name} — open guide`;
       e.innerHTML = `<img src="${srcOf(im, 'card')}" alt=""><b>${esc(d.name)}</b>`;
       e.addEventListener('click', () => navigate(`/destination/${d.id}`));
-      new maplibregl.Marker({ element: e }).setLngLat([d.lon, d.lat]).addTo(m);
+      new maplibregl.Marker({ opacityWhenCovered: '0', element: e }).setLngLat([d.lon, d.lat]).addTo(m);
     });
     m.on('load', () => {
       ready.current = true; kick.current();
@@ -503,6 +532,10 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       const host = el.current?.closest('.mapfly-sticky') as HTMLElement | null;
       if (!host) return;
       const hb = host.getBoundingClientRect();
+      // Phones: the route summary sits just under the From/To panel, whatever its height (a stop adds a row).
+      const form = host.querySelector('.mapfly-route-form') as HTMLElement | null, pill = host.querySelector('.mapfly-route') as HTMLElement | null;
+      if (form && pill) pill.style.top = hb.width < 641 ? `${Math.round(form.getBoundingClientRect().bottom - hb.top + 6)}px` : '';
+      if (form && !formSeen.has(form)) { formSeen.add(form); ro2.observe(form); }
       const bottomOf = (sel: string) => { const n = host.querySelector(sel) as HTMLElement | null; return n && n.offsetParent ? n.getBoundingClientRect().bottom - hb.top : 0; };
       const top = Math.max(bottomOf('.mapfly-route-form'), bottomOf('.mapfly-route'));
       const ui = host.querySelector('.mapfly-ui') as HTMLElement | null;
@@ -510,7 +543,20 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       const clamp2 = (v: number) => Math.max(0, Math.min(hb.height * 0.35, v));
       m.setPadding({ top: clamp2(top + 8), bottom: clamp2(bottom + 8), left: 0, right: 0 });
     };
+    const formSeen = new WeakSet<Element>();
     m.on('load', fitPadding);
+    m.on('moveend', (ev) => {
+      if (!(ev as { originalEvent?: Event }).originalEvent || !globeDrag.current) return;
+      const c = m.getCenter(), lc = lastCam.current;
+      userTurn.current = { x: ((c.lng - lc.c[0] + 540) % 360) - 180, y: c.lat - lc.c[1], b: m.getBearing() - lc.b, t: m.getPitch() - lc.t };
+    });
+    // Place names: OpenFreeMap serves 512px tiles, so near a town the map would read the zoom-13 tiles, which
+    // leave out most cafés, temples, ghats and neighbourhoods. Reading them as 256px tiles loads the full
+    // zoom-14 detail one level earlier (the style spec has no tileSize for vector sources, so it is set here).
+    m.on('load', () => {
+      const src = m.getSource('names') as (maplibregl.VectorTileSource & { tileSize: number }) | undefined;
+      if (src) { src.tileSize = 256; src.setUrl('https://tiles.openfreemap.org/planet'); }
+    });
     padRef.current = fitPadding;
     const ro2 = new ResizeObserver(fitPadding);
     ro2.observe(el.current!);
@@ -566,7 +612,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       guardImg(d);
       const to = placeHref({ kind: 'place', name: s.title, title: s.title, lat: s.lat, lon: s.lon });
       d.addEventListener('click', () => navigate(to));
-      return new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(m);
+      return new maplibregl.Marker({ opacityWhenCovered: '0', element: d }).setLngLat([s.lon, s.lat]).addTo(m);
     });
   }, [tour, near, lat, lon]);
 
@@ -575,7 +621,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     if (!from) return;
     const ctl = new AbortController();
     const markers: Marker[] = [];
-    fetchRoute(from, [lat, lon], ctl.signal, travel, name).then((r) => {
+    (via ? fetchRouteVia(from, via, [lat, lon], ctl.signal, travel, name) : fetchRoute(from, [lat, lon], ctl.signal, travel, name)).then((r) => {
       const m = map.current;
       if (ctl.signal.aborted || !m) return;
       const draw = () => {
@@ -596,11 +642,11 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         const o = document.createElement('div');
         o.className = 'map-origin';
         o.innerHTML = `<span></span><b>${esc(from.name)}</b>`;
-        markers.push(new maplibregl.Marker({ element: o }).setLngLat([from.lon, from.lat]).addTo(m));
+        markers.push(new maplibregl.Marker({ opacityWhenCovered: '0', element: o }).setLngLat([from.lon, from.lat]).addTo(m));
         const mv = document.createElement('div');
         mv.className = 'map-mover';
         mv.textContent = VEHICLE[legsOf(r)[0].travel].icon;
-        mover.current = new maplibregl.Marker({ element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
+        mover.current = new maplibregl.Marker({ opacityWhenCovered: '0', element: mv }).setLngLat([from.lon, from.lat]).addTo(m);
         markers.push(mover.current);
         doneState.current = { n: -1, t: -1 };
         m.setPaintProperty('done', 'line-gradient', doneGradient(0) as maplibregl.ExpressionSpecification);
@@ -625,7 +671,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
           d.innerHTML = `${markerImg(s.image)}<b>${esc(s.title)}</b>`;
           guardImg(d);
           d.addEventListener('click', () => { cardRef.current = i; setCard(i); });
-          markers.push(new maplibregl.Marker({ element: d }).setLngLat([s.lon, s.lat]).addTo(map.current!));
+          markers.push(new maplibregl.Marker({ opacityWhenCovered: '0', element: d }).setLngLat([s.lon, s.lat]).addTo(map.current!));
         });
       });
     });
@@ -718,7 +764,18 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     }
     // Once landed, the vehicle steps aside so the destination pin and its name are what you see.
     mover.current?.getElement().classList.toggle('is-parked', !!rr && p > 0.93);
+    const ut = userTurn.current, fade = clamp(1 - (zoom - globeZoom()) / 2.5);
+    if (fade > 0) { center = [center[0] + ut.x * fade, clamp(center[1] + ut.y * fade, -80, 80)]; bearing += ut.b * fade; pitch = clamp(pitch + ut.t * fade, 0, 60); }
+    else if (ut.x || ut.y || ut.b || ut.t) userTurn.current = { x: 0, y: 0, b: 0, t: 0 };
+    lastCam.current = { c: [center[0] - ut.x * fade, center[1] - ut.y * fade], b: bearing - ut.b * fade, t: pitch - ut.t * fade };
     m.jumpTo({ center, zoom, pitch, bearing });
+    const g = zoom < 3.2 && !freeRef.current && !playRef.current && !reduced;
+    if (g !== globeDrag.current) {
+      globeDrag.current = g;
+      [m.dragPan, m.dragRotate, m.touchZoomRotate].forEach((h) => (g ? h.enable() : h.disable()));
+      if (g && matchMedia('(pointer: coarse)').matches) m.cooperativeGestures.enable(); else if (!g) m.cooperativeGestures.disable();
+    }
+    if ((p > 0.97) !== arrivedRef.current) { arrivedRef.current = p > 0.97; setArrived(p > 0.97); }
     // Keep the flight fluid on any device: if frames run long, render the map at a lower resolution.
     const now = performance.now(), gap = now - perf.current.last;
     perf.current.last = now;
@@ -777,6 +834,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     [m.scrollZoom, m.dragPan, m.dragRotate, m.doubleClickZoom, m.touchZoomRotate, m.keyboard, m.boxZoom, m.touchPitch].forEach((h) => (on ? h.enable() : h.disable()));
     // Touch screens inside the page: one finger keeps scrolling the page, two fingers move the map
     // (otherwise a full-screen map traps the finger). In full screen one finger moves the map.
+    globeDrag.current = false;
     const coarse = matchMedia('(pointer: coarse)').matches;
     if (on && coarse && !fullRef.current) m.cooperativeGestures.enable(); else m.cooperativeGestures.disable();
   };
@@ -876,6 +934,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
   // ── Current location as the starting point: a button, and automatic once the visitor has allowed it. ──
   const [locating, setLocating] = useState(false);
   const [locMsg, setLocMsg] = useState('');
+  useEffect(() => { if (!locMsg) return; const t = setTimeout(() => setLocMsg(''), 7000); return () => clearTimeout(t); }, [locMsg]); // notes fade on their own
   const locate = async (fromButton: boolean) => {
     if (!('geolocation' in navigator)) { if (fromButton) setLocMsg('Location is not available on this device.'); return; }
     setLocating(true); setLocMsg('');
@@ -884,7 +943,17 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
       autoplay.current = fromButton;
       setCustom((c) => ({ ...c, from: here }));
     } catch (e) {
-      if (fromButton) setLocMsg((e as GeolocationPositionError)?.code === 1 ? 'Location permission was declined — type your city in From instead.' : 'Could not find your location — type your city in From instead.');
+      if (!fromButton) return;
+      const denied = (e as GeolocationPositionError)?.code === 1;
+      try {
+        // GPS blocked or unavailable: start from the visitor's approximate city instead.
+        const here = await approxPlace();
+        autoplay.current = true;
+        setCustom((c) => ({ ...c, from: here }));
+        setLocMsg(`📍 Approximate start: ${here.name}${denied ? ' · turn on location for this site for your exact spot' : ''}`);
+      } catch {
+        setLocMsg(denied ? 'Location is off for this site — allow it in browser settings, or type your city' : 'Could not find your location — type your city in From');
+      }
     } finally { setLocating(false); }
   };
   useEffect(() => {
@@ -893,7 +962,11 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pLat, pLon]);
 
-  const zoomBy = (d: number) => map.current?.easeTo({ zoom: map.current.getZoom() + d, duration: 400 });
+  const zoomBy = (d: number) => {
+    // Zooming at the destination hands the camera to the visitor (explore mode), so scrolling won't undo it.
+    if (!free && !reduced) { setFree(true); setInteractive(true); settle(true); }
+    map.current?.easeTo({ zoom: Math.min(19, map.current.getZoom() + d), duration: 400 });
+  };
 
   const hm = hmText;
   const routeLabel = route && from
@@ -915,11 +988,18 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
             <span className="small">{near ? 'Loading the 3D Earth…' : '3D Earth journey'}</span>
           </div>
         )}
-        <form className="mapfly-route-form glass" onSubmit={(e) => e.preventDefault()} aria-label="Plan a route on the map">
-          <PlaceInput label="From" value={from?.name ?? ''} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, from: p })); }} />
-          <button type="button" className="btn btn-sm mf-locate" onClick={() => locate(true)} disabled={locating} aria-label="Start from my current location" title="Start from my current location">{locating ? '…' : '◎'} <span>My location</span></button>
+        <form className={`mapfly-route-form glass${via || addingStop ? ' has-stop' : ''}`} onSubmit={(e) => e.preventDefault()} aria-label="Plan a route on the map">
+          <PlaceInput label="From" value={locating ? 'Finding you…' : from?.name ?? ''} onLocate={() => locate(true)} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, from: p })); }} />
+          {via || addingStop ? (
+            <span className="mf-stop">
+              <PlaceInput label="Stop" value={via?.name ?? ''} placeholder="Add a stop" onPick={(p) => { autoplay.current = true; setAddingStop(false); setCustom((c) => ({ ...c, via: p })); }} />
+              <button type="button" className="btn btn-sm mf-stop-x" onClick={() => { setAddingStop(false); setCustom((c) => ({ ...c, via: undefined })); }} aria-label="Remove the stop" title="Remove the stop">×</button>
+            </span>
+          ) : (
+            <button type="button" className="btn btn-sm mf-add-stop" onClick={() => setAddingStop(true)} aria-label="Add a stop between From and To" title="Add a stop on the way">＋ <span>Stop</span></button>
+          )}
           <PlaceInput label="To" value={name} onPick={(p) => { autoplay.current = true; setCustom((c) => ({ ...c, to: p })); }} />
-          {(custom.from || custom.to) && <button type="button" className="btn btn-sm" onClick={() => setCustom({})} title="Back to this page's place" aria-label="Reset route">↺</button>}
+          {(custom.from || custom.to || custom.via) && <button type="button" className="btn btn-sm" onClick={() => { setAddingStop(false); setCustom({}); }} title="Back to this page's place" aria-label="Reset route">↺</button>}
         </form>
         {routeLabel && <p className="mapfly-route small">{routeLabel}</p>}
         {stops.map((s, i) => (
@@ -931,8 +1011,8 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         ))}
         {/* Every map action in one place: a single "Map options" button opening a small menu. */}
         <div className="mapfly-ui">
-          <button type="button" className="btn btn-sm mf-options-btn" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
-            {playing ? '■ Playing' : '☰ Map options'}
+          <button type="button" className="btn btn-sm mf-options-btn" aria-haspopup="menu" aria-expanded={menuOpen} aria-label={playing ? 'Playing — map options' : 'Map options'} title="Map options" onClick={() => setMenuOpen((o) => !o)}>
+            {playing ? '■' : '☰'}
           </button>
           {menuOpen && (
             <div className="mf-options" role="menu" aria-label="Map options">
@@ -958,7 +1038,7 @@ export function MapFlyIn({ lat: pLat, lon: pLon, name: pName, zoomTo = 16, from:
         {locMsg && <p className="mapfly-offline small" role="status" onClick={() => setLocMsg('')}>{locMsg}</p>}
         {!online && <p className="mapfly-offline small" role="status">Offline — showing the map saved on this device</p>}
         {savedMsg && <p className="mapfly-offline small is-ok" role="status" onClick={() => setSavedMsg('')}>{savedMsg}</p>}
-        {(free || reduced) && (
+        {(free || reduced || arrived) && (
           <div className="mapfly-zoom glass" role="group" aria-label="Zoom">
             <button onClick={() => zoomBy(1)} aria-label="Zoom in">+</button>
             <button onClick={() => zoomBy(-1)} aria-label="Zoom out">−</button>
